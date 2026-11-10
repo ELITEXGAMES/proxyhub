@@ -61,9 +61,14 @@ function findPortPid(port) {
         if (pid && !isNaN(pid)) return pid;
       }
     } else {
-      const out = execSync(`lsof -ti:${port}`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-      const pid = parseInt(out.split('\n')[0], 10);
-      if (pid && !isNaN(pid)) return pid;
+      try {
+        const out = execSync(`fuser ${port}/tcp 2>/dev/null || lsof -ti:${port} 2>/dev/null || ss -lptn 'sport = :${port}' 2>/dev/null`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+        const m = out.match(/\b(\d{2,6})\b/);
+        if (m) {
+          const pid = parseInt(m[1], 10);
+          if (pid && !isNaN(pid)) return pid;
+        }
+      } catch {}
     }
   } catch {}
   return null;
@@ -119,10 +124,11 @@ function killPid(pid) {
     if (process.platform === 'win32') {
       execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
     } else {
-      process.kill(pid, 'SIGTERM');
+      try { process.kill(pid, 'SIGTERM'); } catch {}
       setTimeout(() => {
         try { process.kill(pid, 'SIGKILL'); } catch {}
       }, 1000);
+      try { execSync(`fuser -k ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
     }
     return true;
   } catch {

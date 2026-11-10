@@ -723,6 +723,18 @@ const server = app.listen(PORT, () => {
   console.log(`  📋 Dashboard:  http://localhost:${PORT}/`);
   console.log(`  🔗 API Base:   http://localhost:${PORT}/v1\n`);
 });
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ Error: Port ${PORT} is already in use by another process.`);
+    console.error(`   To free port ${PORT}:`);
+    console.error(`     Debian/Linux:  fuser -k ${PORT}/tcp   or   anti gravity proxy stop`);
+    console.error(`     Windows:       anti gravity proxy stop`);
+    console.error(`   Or start on another port:`);
+    console.error(`     anti gravity proxy start -p ${Number(PORT) + 1}\n`);
+    process.exit(1);
+  }
+  throw err;
+});
 server.keepAliveTimeout = 120000;
 server.headersTimeout = 125000;
 server.requestTimeout = 300000;
