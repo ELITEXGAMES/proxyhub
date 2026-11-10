@@ -19,10 +19,12 @@ Run this single command in Terminal:
 curl -fsSL https://raw.githubusercontent.com/ELITEXGAMES/proxyhub/main/install.sh | bash
 ```
 
-### Or via NPM
+### Or via NPM (Directly from GitHub)
+Run:
 ```bash
-npm install -g antigravity-proxy
+npm install -g ELITEXGAMES/proxyhub
 ```
+*(Note: Do not run `npm install -g antigravity-proxy` as that installs an unrelated legacy package on npmjs. Use `ELITEXGAMES/proxyhub` directly).*
 
 ---
 
