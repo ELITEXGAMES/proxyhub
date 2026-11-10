@@ -52,8 +52,35 @@ cd "$INSTALL_DIR"
 echo "📦 Installing dependencies (npm install)..."
 npm install --omit=dev
 
-echo "🔗 Linking CLI globally (npm link)..."
-npm link
+chmod +x bin/anti.js bin/cli.js
+
+echo "🔗 Linking CLI globally..."
+if npm link 2>/dev/null; then
+    echo "✅ Linked via npm link"
+else
+    echo "⚠️  npm link required elevated permissions. Trying with sudo..."
+    sudo npm link 2>/dev/null || true
+fi
+
+# Fallback guarantee for Debian/Ubuntu: ensure symlinks exist in /usr/local/bin
+if ! command -v anti >/dev/null 2>&1; then
+    if [ -w /usr/local/bin ]; then
+        ln -sf "$INSTALL_DIR/bin/anti.js" /usr/local/bin/anti
+        ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/antigravity-proxy
+        ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/ag-proxy
+    elif command -v sudo >/dev/null 2>&1; then
+        echo "Creating symlinks in /usr/local/bin..."
+        sudo ln -sf "$INSTALL_DIR/bin/anti.js" /usr/local/bin/anti
+        sudo ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/antigravity-proxy
+        sudo ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/ag-proxy
+    else
+        mkdir -p "$HOME/.local/bin"
+        ln -sf "$INSTALL_DIR/bin/anti.js" "$HOME/.local/bin/anti"
+        ln -sf "$INSTALL_DIR/bin/cli.js" "$HOME/.local/bin/antigravity-proxy"
+        ln -sf "$INSTALL_DIR/bin/cli.js" "$HOME/.local/bin/ag-proxy"
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+fi
 
 echo ""
 echo "============================================================="
