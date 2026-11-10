@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service — Antigravity Proxy</title>
+  <meta name="description" content="Terms of Service governing the use of Antigravity Proxy, a local-first interoperability gateway for AI models.">
+  <meta name="robots" content="noindex, follow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #030712;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(30, 41, 59, 0.85);
+      --text: #f9fafb;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --accent: #818cf8;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.75;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 28px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .brand span { color: var(--primary); }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+    }
+    .nav-links a:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+    .nav-links a.active {
+      color: var(--primary);
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+    .btn-back {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--primary) !important;
+      padding: 6px 14px !important;
+      border-radius: 6px;
+      font-size: 13px !important;
+      text-decoration: none;
+      font-weight: 600 !important;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-back:hover {
+      background: var(--primary) !important;
+      color: #030712 !important;
+    }
+    .container {
+      max-width: 900px;
+      margin: 36px auto 60px;
+      padding: 0 24px;
+      flex: 1;
+    }
+    .doc-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 42px 46px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+    }
+    .doc-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+    }
+    .meta-bar span { display: inline-flex; align-items: center; gap: 6px; }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-left: 3px solid var(--primary);
+      padding-left: 12px;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+    p, ul, ol {
+      color: #cbd5e1;
+      font-size: 14.5px;
+      margin-bottom: 16px;
+    }
+    ul, ol { margin-left: 24px; }
+    li { margin-bottom: 8px; }
+    strong { color: #f8fafc; }
+    .alert-box {
+      background: rgba(56, 189, 248, 0.08);
+      border-left: 4px solid var(--primary);
+      padding: 16px 20px;
+      border-radius: 0 10px 10px 0;
+      margin: 22px 0;
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+    .alert-box.warning {
+      background: rgba(245, 158, 11, 0.08);
+      border-left-color: var(--warning);
+    }
+    .alert-box.danger {
+      background: rgba(239, 68, 68, 0.08);
+      border-left-color: var(--danger);
+    }
+    .placeholder {
+      display: inline-block;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px dashed var(--warning);
+      color: #fde68a;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+      font-size: 12.5px;
+    }
+    code {
+      font-family: 'Fira Code', monospace;
+      font-size: 12.5px;
+      background: rgba(30, 41, 59, 0.8);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--primary);
+    }
+    .table-of-contents {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 30px;
+    }
+    .table-of-contents summary {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--primary);
+      cursor: pointer;
+      user-select: none;
+    }
+    .table-of-contents ol {
+      margin: 12px 0 0 20px;
+      font-size: 13px;
+    }
+    .table-of-contents a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .table-of-contents a:hover {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+    footer {
+      border-top: 1px solid var(--card-border);
+      padding: 28px 24px;
+      text-align: center;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      background: rgba(15, 23, 42, 0.7);
+      margin-top: auto;
+    }
+    footer a { color: var(--text-muted); text-decoration: none; margin: 0 8px; transition: color 0.15s; }
+    footer a:hover { color: var(--primary); }
+    @media (max-width: 768px) {
+      .doc-card { padding: 24px 20px; }
+      h1 { font-size: 26px; }
+      .header { flex-direction: column; gap: 14px; align-items: flex-start; padding: 14px 18px; }
+      .nav-links { width: 100%; flex-wrap: wrap; gap: 8px; }
+      .nav-links a { font-size: 12.5px; padding: 4px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <a href="/" class="brand">⚡ Antigravity <span>Proxy</span></a>
+    <nav class="nav-links" aria-label="Legal Navigation">
+      <a href="/" class="btn-back">← Dashboard</a>
+      <a href="/terms" class="active">Terms of Service</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/acceptable-use">Acceptable Use</a>
+      <a href="/disclaimer">Disclaimer</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <article class="doc-card">
+      <div class="doc-badge">Binding Legal Agreement</div>
+      <h1>Terms of Service</h1>
+      
+      <div class="meta-bar">
+        <span>📅 <strong>Last Updated:</strong> November 10, 2026</span>
+        <span>⚡ <strong>Version:</strong> 2.2.0</span>
+        <span>⚖️ <strong>Governing Law:</strong> Republic of India</span>
+        <span>📍 <strong>Operator:</strong> <span class="placeholder">[Operator Name / Legal Entity]</span></span>
+      </div>
+
+      <div class="alert-box">
+        <strong>IMPORTANT NOTICE TO USERS:</strong> These Terms of Service ("Terms") constitute a legally binding agreement between you ("User," "you," or "your") and <span class="placeholder">[Operator Name / Legal Entity]</span> ("Operator," "we," "us," or "our") governing your access to and use of the Antigravity Proxy application, software, local/network endpoints, APIs, and associated web dashboard (collectively, the "Service"). By accessing the Service, generating API credentials, initiating API calls, or connecting accounts, you confirm your acceptance of these Terms.
+      </div>
+
+      <details class="table-of-contents" open>
+        <summary>📑 Table of Contents</summary>
+        <ol>
+          <li><a href="#section-1">1. Acceptance of Terms & Eligibility</a></li>
+          <li><a href="#section-2">2. Architecture & Permitted Scope of Use</a></li>
+          <li><a href="#section-3">3. User Obligations & Account Security</a></li>
+          <li><a href="#section-4">4. API Usage, Network Access & Rate Limiting</a></li>
+          <li><a href="#section-5">5. Prohibited Activities</a></li>
+          <li><a href="#section-6">6. Third-Party AI Providers & Upstream Terms</a></li>
+          <li><a href="#section-7">7. Intellectual Property & License Grants</a></li>
+          <li><a href="#section-8">8. Service Availability, Modifications & Monitoring</a></li>
+          <li><a href="#section-9">9. Suspension, Revocation & Termination</a></li>
+          <li><a href="#section-10">10. Disclaimer of Warranties & Limitation of Liability</a></li>
+          <li><a href="#section-11">11. Indemnification</a></li>
+          <li><a href="#section-12">12. Governing Law, Dispute Resolution & Jurisdiction</a></li>
+          <li><a href="#section-13">13. Severability, Entire Agreement & Contact</a></li>
+        </ol>
+      </details>
+
+      <section id="section-1">
+        <h2>1. Acceptance of Terms & Eligibility</h2>
+        <p>
+          By compiling, installing, running, configuring, or communicating with the Service via HTTP/HTTPS/WebSocket protocols or through client applications (including Claude Code, OpenClaw, Cursor, Continue, or standard OpenAI/Anthropic SDKs), you acknowledge that you have read, understood, and agreed to be bound by these Terms and our <a href="/privacy" style="color:var(--primary);">Privacy Policy</a>, <a href="/acceptable-use" style="color:var(--primary);">Acceptable Use Policy</a>, and <a href="/disclaimer" style="color:var(--primary);">Disclaimer</a>.
+        </p>
+        <p>
+          <strong>Legal Capacity & Age Requirements:</strong> You represent and warrant that you are at least eighteen (18) years of age (or the legal age of majority in your jurisdiction) and possess the full legal capacity to enter into a binding contract under the <strong>Indian Contract Act, 1872</strong> or your local jurisdiction. If you are accessing the Service on behalf of a company, organization, or legal entity, you represent and warrant that you possess express authority to bind that entity to these Terms.
+        </p>
+      </section>
+
+      <section id="section-2">
+        <h2>2. Architecture & Permitted Scope of Use</h2>
+        <p>
+          Antigravity Proxy is an open-source, local-first API interoperability and routing middleware. Its primary function is to transform, aggregate, and route requests between standard client protocols (OpenAI Chat Completions, Anthropic Messages API, Embeddings, Media Generation) and supported upstream provider APIs.
+        </p>
+        <p>The Service is licensed and permitted strictly for:</p>
+        <ul>
+          <li>Personal, academic, research, developer evaluation, and local workflow automation purposes.</li>
+          <li>Benchmarking, testing multi-provider failover chains ("Combos"), and debugging AI-assisted software tools.</li>
+          <li>Lawful and authorized access to upstream models for which you hold legitimate credentials and legal entitlements.</li>
+        </ul>
+        <div class="alert-box warning">
+          <strong>Commercial Public Resale Prohibited:</strong> You shall not package, market, host, or resell the Service as an unauthorized, multi-tenant public commercial AI SaaS service without obtaining prior written authorization from the Operator and strictly complying with upstream AI provider licensing and commercial reselling policies.
+        </div>
+      </section>
+
+      <section id="section-3">
+        <h2>3. User Obligations & Account Security</h2>
+        <p>
+          The Service provides credential management mechanisms for Google OAuth tokens, Gemini Web session cookies (<code>__Secure-1PSID</code> / <code>__Secure-1PSIDTS</code>), and NVIDIA NIM API keys. You bear exclusive responsibility for the custody and confidentiality of all credentials stored on or processed through your instance of the Service:
+        </p>
+        <ul>
+          <li><strong>Confidentiality of API Keys:</strong> You are strictly responsible for maintaining the secrecy of your Proxy API keys (prefixed with <code>agp-</code>) and master dashboard passwords (<code>DASHBOARD_PASSWORD</code>).</li>
+          <li><strong>Activity Attribution:</strong> All requests, tokens consumed, and actions performed using an API key generated from your instance are legally attributed to you.</li>
+          <li><strong>Compromise Notification:</strong> In the event that an API key, cookie, or local storage file (<code>store.json</code>) is lost, stolen, or compromised, you must immediately delete or rotate the compromised key via the Dashboard or CLI commands.</li>
+          <li><strong>No Unauthorized Access:</strong> You must not attempt to guess, extract, brute-force, or hijack credentials belonging to other users or systems.</li>
+        </ul>
+      </section>
+
+      <section id="section-4">
+        <h2>4. API Usage, Network Access & Rate Limiting</h2>
+        <p>
+          The Service incorporates technical safeguards to protect operational stability, avoid quota exhaustion, and prevent denial-of-service conditions:
+        </p>
+        <ul>
+          <li><strong>Sliding-Window Rate Limiting:</strong> Endpoints are protected by an in-memory sliding window rate limiter (default: 120 requests per minute per IP address, configurable via the <code>RATE_LIMIT_RPM</code> environment variable). Requests exceeding this threshold receive HTTP status code <code>429 (Too Many Requests)</code>.</li>
+          <li><strong>Local Network Binding:</strong> By default, the Service binds to local or local-area network interfaces (<code>0.0.0.0:4000</code>). When exposing the Service over local Wi-Fi, Ethernet, or public tunnels, you must implement appropriate firewall controls and set a strong <code>DASHBOARD_PASSWORD</code> and <code>PROXY_API_KEY</code>.</li>
+          <li><strong>No Circumvention:</strong> You shall not employ automated scripts, distributed IP pools, or header manipulation to bypass configured rate limits or authentication middleware.</li>
+        </ul>
+      </section>
+
+      <section id="section-5">
+        <h2>5. Prohibited Activities</h2>
+        <p>
+          You agree to strictly abide by our <a href="/acceptable-use" style="color:var(--primary);">Acceptable Use Policy</a>. Without limiting the generality of that policy, you shall not use the Service to:
+        </p>
+        <ol>
+          <li>Violate any applicable local, state, national, or international law, including the <strong>Information Technology Act, 2000</strong>, the <strong>Bharatiya Nyaya Sanhita, 2023</strong> (or Indian Penal Code), the <strong>Protection of Children from Sexual Offences (POCSO) Act, 2012</strong>, or export control regulations.</li>
+          <li>Transmit, generate, or facilitate Child Sexual Abuse Material (CSAM/CSAE), terroristic content, hate speech inciting violence, non-consensual sexual imagery, or targeted harassment.</li>
+          <li>Develop, test, or distribute malicious code, ransomware, automated exploitation toolkits, zero-day payloads, or phishing campaigns.</li>
+          <li>Interfere with, degrade, or attack the infrastructure of the Operator, upstream AI providers, or any third party (including DDoS attacks or quota flooding).</li>
+          <li>Bypass, reverse-engineer, or defeat content moderation filters, safety guardrails, or quota mechanisms established by upstream AI providers.</li>
+        </ol>
+      </section>
+
+      <section id="section-6">
+        <h2>6. Third-Party AI Providers & Upstream Terms</h2>
+        <p>
+          The Service acts as an intermediary gateway that transmits prompts and requests to third-party artificial intelligence platforms, including Google Cloud Vertex AI / CloudCode, Google Gemini Web, and NVIDIA NIM.
+        </p>
+        <ul>
+          <li><strong>Independent Compliance:</strong> Your use of upstream services via this proxy is directly subject to the respective terms and conditions of those providers, including the <em>Google Terms of Service</em>, <em>Google Cloud Platform Terms</em>, and <em>NVIDIA Developer Program Terms</em>.</li>
+          <li><strong>Billing & Quotas:</strong> You acknowledge that any computational quotas consumed, subscription fees, or cloud charges billed by upstream providers are your sole responsibility.</li>
+          <li><strong>No Provider Guarantee:</strong> The Operator does not warrant that upstream providers will maintain API compatibility, continuous uptime, or unannounced deprecation of model endpoints.</li>
+        </ul>
+      </section>
+
+      <section id="section-7">
+        <h2>7. Intellectual Property & License Grants</h2>
+        <p>
+          <strong>Software License:</strong> The core source code of Antigravity Proxy is licensed under the permissive open-source <strong>MIT License</strong>. You are granted a personal, non-exclusive, revocable, non-transferable right to compile and run the software in accordance with that license and these Terms.
+        </p>
+        <p>
+          <strong>User Inputs & Prompts:</strong> As between you and the Operator, you retain all ownership, intellectual property rights, and title in and to the prompts, code, text, images, or instructions you submit to the Service ("User Inputs").
+        </p>
+        <p>
+          <strong>Generated Outputs:</strong> Ownership, copyright, and commercial rights over machine-generated completions, images, code, or videos returned by upstream models are governed by applicable copyright statutes, judicial precedents, and the terms of service of the specific upstream model provider that generated the completion.
+        </p>
+      </section>
+
+      <section id="section-8">
+        <h2>8. Service Availability, Modifications & Monitoring</h2>
+        <p>
+          <strong>"As-Is" Operational Nature:</strong> The Service is provided on an "AS-IS" and "AS-AVAILABLE" basis without service level agreements (SLAs), uptime commitments, or latency warranties.
+        </p>
+        <p>
+          <strong>Modifications:</strong> The Operator reserves the right to modify, refactor, add, or discontinue features, supported model endpoints, combo fallback logic, or interface elements at any time without prior notice or liability.
+        </p>
+        <p>
+          <strong>No Content Snooping:</strong> The Operator does not inspect, read, sell, or advertise against your prompt content. However, server operational logs record high-level metadata (HTTP method, model name, status code, IP address, latency) necessary to maintain security and enforce rate limits.
+        </p>
+      </section>
+
+      <section id="section-9">
+        <h2>9. Suspension, Revocation & Termination</h2>
+        <p>
+          <strong>Termination by User:</strong> You may terminate these Terms at any time by ceasing all use of the Service, deleting all API keys, clearing local data from <code>~/.antigravity-proxy/</code>, and deleting the software from your devices.
+        </p>
+        <p>
+          <strong>Termination by Operator:</strong> The Operator reserves the right, in its sole and absolute discretion, to immediately suspend, revoke, disable API keys, or terminate access to the Service for any user or IP address found to be:
+        </p>
+        <ul>
+          <li>In breach of any provision of these Terms or the Acceptable Use Policy;</li>
+          <li>Engaged in abusive, malicious, or unauthorized automated resource utilization;</li>
+          <li>Required to be terminated pursuant to a lawful court order, law enforcement request, or statutory mandate under Indian law.</li>
+        </ul>
+      </section>
+
+      <section id="section-10">
+        <h2>10. Disclaimer of Warranties & Limitation of Liability</h2>
+        <div class="alert-box danger">
+          <strong>LIMITATION OF LIABILITY (IMPORTANT LEGAL PROVISION):</strong>
+          <p style="margin-top:8px;">
+            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW IN INDIA AND INTERNATIONALLY, THE OPERATOR, DEVELOPERS, AUTHORS, AND CONTRIBUTORS DISCLAIM ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING WITHOUT LIMITATION WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+          </p>
+          <p style="margin-top:8px;">
+            UNDER NO CIRCUMSTANCES SHALL THE OPERATOR OR ANY CONTRIBUTOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, PUNITIVE, OR EXEMPLARY DAMAGES (INCLUDING LOSS OF PROFITS, LOSS OF REVENUE, LOSS OF DATA, GOODWILL, REPUTATIONAL HARM, WORK STOPPAGE, COMPUTER FAILURE, OR CLOUD BILLING SPIKES) ARISING OUT OF OR IN CONNECTION WITH YOUR USE OR INABILITY TO USE THE SERVICE.
+          </p>
+        </div>
+        <p>
+          Nothing in these Terms purports to exclude or limit liability for gross negligence, willful misconduct, fraud, or any statutory liability that cannot be excluded under applicable consumer protection or mandatory statutory laws of India.
+        </p>
+      </section>
+
+      <section id="section-11">
+        <h2>11. Indemnification</h2>
+        <p>
+          You agree to defend, indemnify, and hold harmless the Operator, maintainers, contributors, and agents from and against any and all claims, liabilities, damages, losses, costs, and expenses (including reasonable legal and attorney fees) arising out of or in any way connected with:
+        </p>
+        <ul>
+          <li>Your breach of these Terms, the Privacy Policy, or the Acceptable Use Policy;</li>
+          <li>Your User Inputs, generated completions, or downstream deployment of AI-generated content;</li>
+          <li>Your violation of any third-party intellectual property, privacy, or statutory right;</li>
+          <li>Your violation of applicable laws, regulations, or third-party AI provider agreements.</li>
+        </ul>
+      </section>
+
+      <section id="section-12">
+        <h2>12. Governing Law, Dispute Resolution & Jurisdiction</h2>
+        <p>
+          <strong>Governing Law:</strong> These Terms, your use of the Service, and all disputes, claims, or controversies arising out of or relating to this agreement shall be governed by, construed, and enforced in accordance with the substantive laws of the <strong>Republic of India</strong>, including the <strong>Information Technology Act, 2000</strong>, the <strong>Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021</strong>, and the <strong>Digital Personal Data Protection Act, 2023</strong>, without regard to conflict of laws principles.
+        </p>
+        <p>
+          <strong>Exclusive Jurisdiction:</strong> Subject to mandatory dispute resolution procedures, any legal suit, action, or proceeding arising out of or related to these Terms or the Service shall be instituted exclusively in the competent courts located in <span class="placeholder">[City, State, India]</span>, and you irrevocably submit to the exclusive personal jurisdiction of such courts.
+        </p>
+      </section>
+
+      <section id="section-13">
+        <h2>13. Severability, Entire Agreement & Contact</h2>
+        <p>
+          <strong>Severability:</strong> If any provision of these Terms is found to be unlawful, void, or unenforceable by a court of competent jurisdiction, that provision shall be deemed severable and shall not affect the validity and enforceability of any remaining provisions.
+        </p>
+        <p>
+          <strong>Entire Agreement:</strong> These Terms, together with our Privacy Policy, Acceptable Use Policy, and Legal Disclaimer, constitute the entire agreement between you and the Operator regarding the Service.
+        </p>
+        <p>
+          <strong>Contact & Grievance Redressal:</strong> For inquiries regarding these Terms or to report compliance matters, contact:
+        </p>
+        <div style="background:rgba(15,23,42,0.8); border:1px solid var(--card-border); padding:16px 20px; border-radius:8px; font-size:13.5px; margin-top:12px;">
+          <p style="margin-bottom:6px;"><strong>Legal Inquiries:</strong> <span class="placeholder">[legal@yourdomain.com / Contact Email]</span></p>
+          <p style="margin-bottom:6px;"><strong>Operator / Entity:</strong> <span class="placeholder">[Operator Name / Legal Entity]</span></p>
+          <p style="margin-bottom:0;"><strong>Location:</strong> <span class="placeholder">[City, State, PIN Code, India]</span></p>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Antigravity Proxy Project &bull; Open-Source Local Interoperability Gateway</p>
+    <p style="margin-top:10px;">
+      <a href="/terms">Terms of Service</a> &bull;
+      <a href="/privacy">Privacy Policy</a> &bull;
+      <a href="/acceptable-use">Acceptable Use Policy</a> &bull;
+      <a href="/disclaimer">Legal Disclaimer</a>
+    </p>
+    <p style="margin-top:6px; font-size:11.5px; color:#64748b;">
+      Governed by the laws of India. For educational, research, and authorized developer development use.
+    </p>
+  </footer>
+
+</body>
+</html>

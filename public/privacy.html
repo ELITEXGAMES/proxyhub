@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Antigravity Proxy</title>
+  <meta name="description" content="Privacy Policy detailing data processing, local-first storage, analytics, and rights under India's Digital Personal Data Protection Act (DPDPA), 2023.">
+  <meta name="robots" content="noindex, follow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #030712;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(30, 41, 59, 0.85);
+      --text: #f9fafb;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --accent: #818cf8;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.75;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 28px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .brand span { color: var(--primary); }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+    }
+    .nav-links a:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+    .nav-links a.active {
+      color: var(--primary);
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+    .btn-back {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--primary) !important;
+      padding: 6px 14px !important;
+      border-radius: 6px;
+      font-size: 13px !important;
+      text-decoration: none;
+      font-weight: 600 !important;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-back:hover {
+      background: var(--primary) !important;
+      color: #030712 !important;
+    }
+    .container {
+      max-width: 900px;
+      margin: 36px auto 60px;
+      padding: 0 24px;
+      flex: 1;
+    }
+    .doc-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 42px 46px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+    }
+    .doc-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #10b981 0%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+    }
+    .meta-bar span { display: inline-flex; align-items: center; gap: 6px; }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-left: 3px solid var(--success);
+      padding-left: 12px;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+    p, ul, ol {
+      color: #cbd5e1;
+      font-size: 14.5px;
+      margin-bottom: 16px;
+    }
+    ul, ol { margin-left: 24px; }
+    li { margin-bottom: 8px; }
+    strong { color: #f8fafc; }
+    .alert-box {
+      background: rgba(16, 185, 129, 0.08);
+      border-left: 4px solid var(--success);
+      padding: 16px 20px;
+      border-radius: 0 10px 10px 0;
+      margin: 22px 0;
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+    .alert-box.info {
+      background: rgba(56, 189, 248, 0.08);
+      border-left-color: var(--primary);
+    }
+    .placeholder {
+      display: inline-block;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px dashed var(--warning);
+      color: #fde68a;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+      font-size: 12.5px;
+    }
+    code {
+      font-family: 'Fira Code', monospace;
+      font-size: 12.5px;
+      background: rgba(30, 41, 59, 0.8);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--primary);
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 13.5px;
+    }
+    .data-table th, .data-table td {
+      border: 1px solid var(--card-border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+    .data-table th {
+      background: rgba(30, 41, 59, 0.6);
+      color: var(--text);
+      font-weight: 600;
+    }
+    .data-table tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .table-of-contents {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 30px;
+    }
+    .table-of-contents summary {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--primary);
+      cursor: pointer;
+      user-select: none;
+    }
+    .table-of-contents ol {
+      margin: 12px 0 0 20px;
+      font-size: 13px;
+    }
+    .table-of-contents a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .table-of-contents a:hover {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+    footer {
+      border-top: 1px solid var(--card-border);
+      padding: 28px 24px;
+      text-align: center;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      background: rgba(15, 23, 42, 0.7);
+      margin-top: auto;
+    }
+    footer a { color: var(--text-muted); text-decoration: none; margin: 0 8px; transition: color 0.15s; }
+    footer a:hover { color: var(--primary); }
+    @media (max-width: 768px) {
+      .doc-card { padding: 24px 20px; }
+      h1 { font-size: 26px; }
+      .header { flex-direction: column; gap: 14px; align-items: flex-start; padding: 14px 18px; }
+      .nav-links { width: 100%; flex-wrap: wrap; gap: 8px; }
+      .nav-links a { font-size: 12.5px; padding: 4px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <a href="/" class="brand">⚡ Antigravity <span>Proxy</span></a>
+    <nav class="nav-links" aria-label="Legal Navigation">
+      <a href="/" class="btn-back">← Dashboard</a>
+      <a href="/terms">Terms of Service</a>
+      <a href="/privacy" class="active">Privacy Policy</a>
+      <a href="/acceptable-use">Acceptable Use</a>
+      <a href="/disclaimer">Disclaimer</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <article class="doc-card">
+      <div class="doc-badge">Data Protection & Privacy Notice</div>
+      <h1>Privacy Policy</h1>
+      
+      <div class="meta-bar">
+        <span>📅 <strong>Last Updated:</strong> November 10, 2026</span>
+        <span>🛡️ <strong>Statute:</strong> Digital Personal Data Protection Act (DPDPA), 2023 (India)</span>
+        <span>🔒 <strong>Architecture:</strong> Local-First / Zero Developer Telemetry</span>
+        <span>📍 <strong>Data Fiduciary:</strong> <span class="placeholder">[Operator Name / Legal Entity]</span></span>
+      </div>
+
+      <div class="alert-box">
+        <strong>LOCAL-FIRST ARCHITECTURE SUMMARY:</strong> Antigravity Proxy is designed and architected as a <strong>local-first software gateway</strong>. The software runs locally on your workstation or private server. <strong>We (the developers of Antigravity Proxy) do NOT operate central servers, collect telemetry, track your IP address, or store your prompts.</strong> All authentication tokens, cookie sessions, and usage metrics remain stored on the local host filesystem under your direct custody.
+      </div>
+
+      <details class="table-of-contents" open>
+        <summary>📑 Table of Contents</summary>
+        <ol>
+          <li><a href="#privacy-1">1. Scope, Purpose & Roles</a></li>
+          <li><a href="#privacy-2">2. Categories of Information Processed</a></li>
+          <li><a href="#privacy-3">3. How Prompts, Messages & Conversations Are Handled</a></li>
+          <li><a href="#privacy-4">4. IP Addresses, Logging & Rate Limiter Cache</a></li>
+          <li><a href="#privacy-5">5. Local Storage & File System Persistence</a></li>
+          <li><a href="#privacy-6">6. Third-Party AI Providers & Upstream Data Flows</a></li>
+          <li><a href="#privacy-7">7. Cookies & Browser Storage Mechanisms</a></li>
+          <li><a href="#privacy-8">8. Data Retention, Purging & Deletion Procedures</a></li>
+          <li><a href="#privacy-9">9. Technical & Security Safeguards</a></li>
+          <li><a href="#privacy-10">10. User Rights under DPDPA, 2023 (India)</a></li>
+          <li><a href="#privacy-11">11. International Users (GDPR / CCPA Considerations)</a></li>
+          <li><a href="#privacy-12">12. Grievance Officer & Contact Information</a></li>
+        </ol>
+      </details>
+
+      <section id="privacy-1">
+        <h2>1. Scope, Purpose & Roles</h2>
+        <p>
+          This Privacy Policy explains how <span class="placeholder">[Operator Name / Legal Entity]</span> ("Operator," "we," or "Data Fiduciary") collects, processes, stores, and protects digital data when you interact with the Antigravity Proxy software and dashboard.
+        </p>
+        <p>
+          This policy is formulated in compliance with the <strong>Digital Personal Data Protection Act, 2023 (DPDPA 2023)</strong> and the <strong>Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011</strong> under the laws of the Republic of India.
+        </p>
+      </section>
+
+      <section id="privacy-2">
+        <h2>2. Categories of Information Processed</h2>
+        <p>Depending on the features configured in your instance, the Service processes the following categories of data:</p>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Data Category</th>
+              <th>Specific Items</th>
+              <th>Storage Location</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Account Profile Data</strong></td>
+              <td>Google Account Email, Display Name, Profile Avatar URL</td>
+              <td>Local host (<code>store.json</code>)</td>
+              <td>To display connected accounts and associate quotas in multi-account pools.</td>
+            </tr>
+            <tr>
+              <td><strong>Authentication Credentials</strong></td>
+              <td>OAuth Refresh Tokens, Gemini Web Cookies (<code>__Secure-1PSID</code>), NVIDIA NIM Keys</td>
+              <td>Local host (<code>store.json</code>)</td>
+              <td>To authenticate upstream API calls on behalf of the user.</td>
+            </tr>
+            <tr>
+              <td><strong>Proxy API Keys</strong></td>
+              <td>Cryptographic tokens generated locally (prefix <code>agp-</code>)</td>
+              <td>Local host (<code>store.json</code>)</td>
+              <td>To authorize local client applications (Claude Code, OpenClaw, Continue).</td>
+            </tr>
+            <tr>
+              <td><strong>Request Metadata</strong></td>
+              <td>Timestamp, model ID, prompt token count, completion token count, latency (ms), HTTP status</td>
+              <td>Local host (<code>store.json</code>)</td>
+              <td>To compute token analytics, track quota burn, and display recent request history.</td>
+            </tr>
+            <tr>
+              <td><strong>Generated Media</strong></td>
+              <td>Base64-decoded images and videos generated via Imagen 3 / Veo 2</td>
+              <td>Local host (<code>public/media/</code>)</td>
+              <td>To render previews and allow users to download generated media.</td>
+            </tr>
+            <tr>
+              <td><strong>Network & Connection</strong></td>
+              <td>Client IP address, HTTP headers (User-Agent, Anthropic-Version)</td>
+              <td>Volatile Memory & Server Logs</td>
+              <td>To enforce sliding window rate limits (120 RPM) and ensure network stability.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="privacy-3">
+        <h2>3. How Prompts, Messages & Conversations Are Handled</h2>
+        <div class="alert-box info">
+          <strong>VERIFIED CODEBASE IMPLEMENTATION:</strong>
+          <ul style="margin:8px 0 0 18px;">
+            <li><strong>No Persistent Prompt Storage:</strong> The Proxy does <strong>NOT</strong> save, store, or log the text content of your prompts, messages, code snippets, or AI completions in the database or analytics store.</li>
+            <li><strong>Ephemeral Processing:</strong> Request bodies received on <code>/v1/chat/completions</code> or <code>/v1/messages</code> are held in volatile RAM only for the duration required to transform the request format and stream upstream packets.</li>
+            <li><strong>Log Redaction:</strong> Operational console logs explicitly redact message contents by default. Only metadata (model name, streaming status, message array length) is logged.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="privacy-4">
+        <h2>4. IP Addresses, Logging & Rate Limiter Cache</h2>
+        <p>
+          <strong>Rate Limiter Cache:</strong> To protect the local instance from abusive traffic, loop conditions, or quota exhaustion, an in-memory sliding window rate limiter monitors client IP addresses. This cache stores the IP address and request count, and is automatically cleared and reset every sixty (60) seconds. It is never persisted to disk.
+        </p>
+        <p>
+          <strong>Server Logs:</strong> When the proxy runs in daemon mode or behind logging redirection (via <code>AG_LOG_FILE</code>), the Node.js process writes operational events (such as server startup, token refreshes, and connection status). Internal filesystem paths and credentials (<code>ya29...</code>, <code>AIzaSy...</code>, <code>agp-...</code>) are programmatically redacted via a regex sanitizer before writing to disk.
+        </p>
+      </section>
+
+      <section id="privacy-5">
+        <h2>5. Local Storage & File System Persistence</h2>
+        <p>
+          All persistent state managed by the Service is stored exclusively on the host operating system in the user's home directory:
+        </p>
+        <p><code>~/.antigravity-proxy/store.json</code> (Windows: <code>%USERPROFILE%\.antigravity-proxy\store.json</code>)</p>
+        <p>
+          This design ensures that your data is completely separated from the git repository working tree. If you clone, update, or publicize your git repository, your credentials, keys, and tokens remain secure on your local workstation and are never pushed to GitHub or external source repositories.
+        </p>
+      </section>
+
+      <section id="privacy-6">
+        <h2>6. Third-Party AI Providers & Upstream Data Flows</h2>
+        <p>
+          When you dispatch a request to the Service, the proxy securely transmits your prompt data over encrypted TLS (HTTPS) connections directly to the respective upstream API provider:
+        </p>
+        <ul>
+          <li><strong>Google LLC / Alphabet Inc. (Google Cloud & Gemini Web):</strong> If targeting Gemini models, prompts are transmitted directly to Google endpoints (<code>daily-cloudcode-pa.googleapis.com</code>, <code>generativelanguage.googleapis.com</code>, or <code>gemini.google.com</code>). Google processes this data pursuant to the <em>Google Privacy Policy</em> and <em>Google Cloud Privacy Notice</em>.</li>
+          <li><strong>NVIDIA Corporation (NVIDIA NIM):</strong> If targeting NIM models, prompts are transmitted directly to <code>integrate.api.nvidia.com</code> pursuant to the <em>NVIDIA Privacy Policy</em>.</li>
+        </ul>
+        <p>
+          <strong>Zero Developer Telemetry:</strong> No copy of your prompt, response, or metadata is ever forwarded to the author or maintainers of Antigravity Proxy.
+        </p>
+      </section>
+
+      <section id="privacy-7">
+        <h2>7. Cookies & Browser Storage Mechanisms</h2>
+        <p>The web dashboard utilizes minimal local storage and browser cookies for session state:</p>
+        <ul>
+          <li><code>ag_token</code> (Browser Cookie / LocalStorage): Stores your active session token for seamless authentication between the browser dashboard and local endpoints.</li>
+          <li><code>ag_dash_pwd</code>: Used only if a <code>DASHBOARD_PASSWORD</code> is configured in your <code>.env</code> file.</li>
+          <li><strong>No Third-Party Tracking Cookies:</strong> The dashboard does NOT use Google Analytics, Facebook Pixel, tracking beacons, advertising cookies, or third-party telemetry scripts.</li>
+        </ul>
+      </section>
+
+      <section id="privacy-8">
+        <h2>8. Data Retention, Purging & Deletion Procedures</h2>
+        <p>
+          Because all data is hosted locally under your direct custody, you have complete sovereignty over retention and purging:
+        </p>
+        <ul>
+          <li><strong>Purging Analytics:</strong> Clicking <strong>"🗑️ Clear Analytics"</strong> in the web dashboard instantly erases all recorded token counts, model breakdowns, and the 50-item request history.</li>
+          <li><strong>Removing Accounts & Cookies:</strong> Accounts and Gemini cookies can be disconnected or permanently deleted at any time from the Accounts tab.</li>
+          <li><strong>Purging Generated Media:</strong> You can delete all generated images and videos by clearing the <code>public/media/</code> directory.</li>
+          <li><strong>Complete Factory Reset:</strong> Deleting the <code>~/.antigravity-proxy/</code> folder immediately purges 100% of all stored credentials, keys, combos, and logs.</li>
+        </ul>
+      </section>
+
+      <section id="privacy-9">
+        <h2>9. Technical & Security Safeguards</h2>
+        <p>The Service implements defense-in-depth security measures to protect data integrity:</p>
+        <ul>
+          <li><strong>HTTP Security Headers:</strong> Incorporates <code>X-Content-Type-Options: nosniff</code>, <code>X-Frame-Options: SAMEORIGIN</code>, <code>X-XSS-Protection</code>, and strict referrer policies.</li>
+          <li><strong>Input & Payload Validation:</strong> Restricts incoming JSON payloads to 50MB and validates schema structures before processing.</li>
+          <li><strong>Credential Masking:</strong> Automated sanitization routines redact authorization tokens, paths, and secrets from all error messages and server exception outputs.</li>
+          <li><strong>Token Cryptography:</strong> Proxy API keys are generated using cryptographically secure pseudorandom numbers (Node.js <code>crypto.randomBytes</code>).</li>
+        </ul>
+      </section>
+
+      <section id="privacy-10">
+        <h2>10. User Rights under DPDPA, 2023 (India)</h2>
+        <p>
+          If you are located in India, you are recognized as a <strong>Data Principal</strong> under the <strong>Digital Personal Data Protection Act, 2023</strong>, and possess the following statutory rights regarding your personal data processed by the Operator:
+        </p>
+        <ol>
+          <li><strong>Right to Access Information (Section 11):</strong> You have the right to obtain a summary of personal data processed, identities of all third parties with whom data has been shared, and any other relevant information.</li>
+          <li><strong>Right to Correction & Erasure (Section 12):</strong> You have the right to correct, complete, update, and request the erasure of your personal data stored within the Service. You can exercise this directly through the Dashboard or by deleting <code>store.json</code>.</li>
+          <li><strong>Right of Grievance Redressal (Section 13):</strong> You have the right to register grievances with the Data Fiduciary's designated Grievance Officer regarding the processing of your personal data.</li>
+          <li><strong>Right to Nominate (Section 14):</strong> You have the right to nominate an individual to exercise your rights in the event of death or incapacity.</li>
+        </ol>
+      </section>
+
+      <section id="privacy-11">
+        <h2>11. International Users (GDPR / CCPA Considerations)</h2>
+        <p>
+          For users operating in the European Economic Area (EEA), United Kingdom, or California:
+        </p>
+        <ul>
+          <li><strong>Lawful Basis:</strong> Processing of account credentials and tokens is conducted strictly on the basis of <em>performance of a contract</em> (delivering the proxy services requested) and <em>legitimate interests</em> (securing the proxy infrastructure against abuse).</li>
+          <li><strong>No Sale of Personal Data:</strong> We do NOT sell, lease, or monetize your personal information under the California Consumer Privacy Act (CCPA).</li>
+        </ul>
+      </section>
+
+      <section id="privacy-12">
+        <h2>12. Grievance Officer & Contact Information</h2>
+        <p>
+          In accordance with the <strong>Information Technology Act, 2000</strong> and the <strong>Digital Personal Data Protection Act, 2023</strong>, the details of the designated Grievance Officer are set forth below:
+        </p>
+        <div style="background:rgba(15,23,42,0.8); border:1px solid var(--card-border); padding:20px; border-radius:10px; font-size:13.5px; margin-top:14px;">
+          <p style="margin-bottom:8px;"><strong>Attention:</strong> Grievance Redressal Officer</p>
+          <p style="margin-bottom:8px;"><strong>Officer Name:</strong> <span class="placeholder">[Grievance Officer Name]</span></p>
+          <p style="margin-bottom:8px;"><strong>Entity / Operator:</strong> <span class="placeholder">[Operator Name / Legal Entity]</span></p>
+          <p style="margin-bottom:8px;"><strong>Privacy & Grievance Email:</strong> <span class="placeholder">[privacy@yourdomain.com / Contact Email]</span></p>
+          <p style="margin-bottom:8px;"><strong>Postal Address:</strong> <span class="placeholder">[Operator Address, City, State, PIN Code, India]</span></p>
+          <p style="margin-bottom:0; font-size:12px; color:var(--text-muted);">
+            * Redressal timelines: We endeavor to acknowledge and address all written data protection grievances within the statutory timeline prescribed under applicable Indian rules (not exceeding 30 days).
+          </p>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Antigravity Proxy Project &bull; Open-Source Local Interoperability Gateway</p>
+    <p style="margin-top:10px;">
+      <a href="/terms">Terms of Service</a> &bull;
+      <a href="/privacy">Privacy Policy</a> &bull;
+      <a href="/acceptable-use">Acceptable Use Policy</a> &bull;
+      <a href="/disclaimer">Legal Disclaimer</a>
+    </p>
+    <p style="margin-top:6px; font-size:11.5px; color:#64748b;">
+      Compliant with the Digital Personal Data Protection Act (DPDPA), 2023 of India.
+    </p>
+  </footer>
+
+</body>
+</html>

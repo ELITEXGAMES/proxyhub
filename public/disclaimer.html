@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Legal Disclaimer & Limitation of Liability — Antigravity Proxy</title>
+  <meta name="description" content="Legal disclaimer, trademark notices, non-affiliation disclosures, and limitation of liability for Antigravity Proxy.">
+  <meta name="robots" content="noindex, follow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #030712;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(30, 41, 59, 0.85);
+      --text: #f9fafb;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --accent: #818cf8;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.75;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 28px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .brand span { color: var(--primary); }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+    }
+    .nav-links a:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+    .nav-links a.active {
+      color: var(--warning);
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+    .btn-back {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--primary) !important;
+      padding: 6px 14px !important;
+      border-radius: 6px;
+      font-size: 13px !important;
+      text-decoration: none;
+      font-weight: 600 !important;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-back:hover {
+      background: var(--primary) !important;
+      color: #030712 !important;
+    }
+    .container {
+      max-width: 900px;
+      margin: 36px auto 60px;
+      padding: 0 24px;
+      flex: 1;
+    }
+    .doc-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 42px 46px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+    }
+    .doc-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.12);
+      color: var(--warning);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #f59e0b 0%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+    }
+    .meta-bar span { display: inline-flex; align-items: center; gap: 6px; }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-left: 3px solid var(--warning);
+      padding-left: 12px;
+    }
+    p, ul, ol {
+      color: #cbd5e1;
+      font-size: 14.5px;
+      margin-bottom: 16px;
+    }
+    ul, ol { margin-left: 24px; }
+    li { margin-bottom: 8px; }
+    strong { color: #f8fafc; }
+    .alert-box {
+      background: rgba(245, 158, 11, 0.08);
+      border-left: 4px solid var(--warning);
+      padding: 16px 20px;
+      border-radius: 0 10px 10px 0;
+      margin: 22px 0;
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+    .alert-box.danger {
+      background: rgba(239, 68, 68, 0.08);
+      border-left-color: var(--danger);
+    }
+    .alert-box.info {
+      background: rgba(56, 189, 248, 0.08);
+      border-left-color: var(--primary);
+    }
+    .placeholder {
+      display: inline-block;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px dashed var(--warning);
+      color: #fde68a;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+      font-size: 12.5px;
+    }
+    code {
+      font-family: 'Fira Code', monospace;
+      font-size: 12.5px;
+      background: rgba(30, 41, 59, 0.8);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--primary);
+    }
+    .provider-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 12px;
+    }
+    .provider-card h4 {
+      font-size: 14.5px;
+      color: #e2e8f0;
+      margin-bottom: 4px;
+    }
+    .provider-card p {
+      font-size: 13px;
+      margin-bottom: 0;
+      color: var(--text-muted);
+    }
+    .table-of-contents {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 30px;
+    }
+    .table-of-contents summary {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--primary);
+      cursor: pointer;
+      user-select: none;
+    }
+    .table-of-contents ol {
+      margin: 12px 0 0 20px;
+      font-size: 13px;
+    }
+    .table-of-contents a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .table-of-contents a:hover {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+    footer {
+      border-top: 1px solid var(--card-border);
+      padding: 28px 24px;
+      text-align: center;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      background: rgba(15, 23, 42, 0.7);
+      margin-top: auto;
+    }
+    footer a { color: var(--text-muted); text-decoration: none; margin: 0 8px; transition: color 0.15s; }
+    footer a:hover { color: var(--primary); }
+    @media (max-width: 768px) {
+      .doc-card { padding: 24px 20px; }
+      h1 { font-size: 26px; }
+      .header { flex-direction: column; gap: 14px; align-items: flex-start; padding: 14px 18px; }
+      .nav-links { width: 100%; flex-wrap: wrap; gap: 8px; }
+      .nav-links a { font-size: 12.5px; padding: 4px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <a href="/" class="brand">⚡ Antigravity <span>Proxy</span></a>
+    <nav class="nav-links" aria-label="Legal Navigation">
+      <a href="/" class="btn-back">← Dashboard</a>
+      <a href="/terms">Terms of Service</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/acceptable-use">Acceptable Use</a>
+      <a href="/disclaimer" class="active">Disclaimer</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <article class="doc-card">
+      <div class="doc-badge">Statutory Disclosures & Liability Boundaries</div>
+      <h1>Legal Disclaimer & Limitation of Liability</h1>
+      
+      <div class="meta-bar">
+        <span>📅 <strong>Last Updated:</strong> November 10, 2026</span>
+        <span>⚖️ <strong>Legal Framework:</strong> Indian Contract Act, Consumer Protection & IT Act</span>
+        <span>🔍 <strong>Purpose:</strong> Research, Education & Evaluation</span>
+        <span>📍 <strong>Operator:</strong> <span class="placeholder">[Operator Name / Legal Entity]</span></span>
+      </div>
+
+      <div class="alert-box">
+        <strong>IMPORTANT TRANSPARENCY NOTICE:</strong> This Legal Disclaimer sets forth the express limitations of warranty, non-affiliation disclosures, and boundaries of liability governing Antigravity Proxy. This document is provided to ensure complete transparency between the Operator and Users. <strong>This disclaimer does not purport to fabricate immunity from the law, nor does it claim to protect against statutory obligations that cannot be lawfully excluded under applicable Indian or international statutes.</strong>
+      </div>
+
+      <details class="table-of-contents" open>
+        <summary>📑 Table of Contents</summary>
+        <ol>
+          <li><a href="#disc-1">1. Purpose: Educational, Research & Developer Evaluation</a></li>
+          <li><a href="#disc-2">2. User Sole Responsibility & Autonomous Decision-Making</a></li>
+          <li><a href="#disc-3">3. AI-Generated Output & Hallucination Notice</a></li>
+          <li><a href="#disc-4">4. No Service Level Agreement (SLA) & Uninterrupted Operation</a></li>
+          <li><a href="#disc-5">5. Explicit Third-Party Non-Affiliation & Trademark Notice</a></li>
+          <li><a href="#disc-6">6. Mandatory Compliance with Upstream Provider Terms</a></li>
+          <li><a href="#disc-7">7. No Encouragement or Authorization of Unlawful Use</a></li>
+          <li><a href="#disc-8">8. Comprehensive Limitation of Liability</a></li>
+          <li><a href="#disc-9">9. Statutory Exceptions Where Liability Cannot Be Excluded</a></li>
+          <li><a href="#disc-10">10. Independent Legal Counsel Recommendation</a></li>
+        </ol>
+      </details>
+
+      <section id="disc-1">
+        <h2>1. Purpose: Educational, Research & Developer Evaluation</h2>
+        <p>
+          Antigravity Proxy is an experimental, open-source software project engineered solely for:
+        </p>
+        <ul>
+          <li><strong>Educational exploration:</strong> Understanding protocol conversion between OpenAI Chat Completions, Anthropic Messages APIs, and Google CloudCode / Gemini Web architectures.</li>
+          <li><strong>Developer evaluation & research:</strong> Conducting latency benchmarks, researching multi-model fallback resiliency strategies ("Combos"), and developing local AI coding workflows.</li>
+          <li><strong>Local workflow orchestration:</strong> Assisting individual developers in testing tools like Claude Code, OpenClaw, and Continue in private, non-production sandbox environments.</li>
+        </ul>
+        <p>
+          The software is NOT marketed, certified, or intended for use in mission-critical environments, emergency services, medical triage, aviation, life-support systems, nuclear facilities, or any high-risk application where software failure could result in death, personal injury, or catastrophic physical or environmental damage.
+        </p>
+      </section>
+
+      <section id="disc-2">
+        <h2>2. User Sole Responsibility & Autonomous Decision-Making</h2>
+        <p>
+          You acknowledge and agree that you exercise independent judgment when compiling, launching, and routing requests through the Service. The Operator does not supervise, review, filter, or control the prompts you submit or the software you build with the completions returned.
+        </p>
+        <p>
+          You are solely responsible for:
+        </p>
+        <ul>
+          <li>All prompts, instructions, images, and data inputs transmitted through the proxy.</li>
+          <li>Thoroughly reviewing, testing, linting, and verifying all source code, technical solutions, and text generated by upstream AI models before compiling, executing, or distributing it.</li>
+          <li>Securing your host workstation, network firewall, port forwarding rules, and reverse proxies.</li>
+          <li>Any computational fees, quota overages, or commercial liabilities incurred with third-party model providers.</li>
+        </ul>
+      </section>
+
+      <section id="disc-3">
+        <h2>3. AI-Generated Output & Hallucination Notice</h2>
+        <div class="alert-box danger">
+          <strong>WARNING REGARDING AI GENERATIONS:</strong>
+          <p style="margin-top:8px;">
+            Artificial intelligence models are statistical generative systems. Outputs may be inaccurate, incomplete, misleading, non-functional, mathematically flawed, biased, or wholly fabricated ("hallucinated").
+          </p>
+          <p style="margin-top:8px;">
+            Neither the Operator nor Antigravity Proxy guarantees the factual accuracy, correctness, security, or utility of any AI-generated response, code snippet, image, or video. You must not rely on AI outputs for legal, medical, financial, investment, or architectural engineering decisions.
+          </p>
+        </div>
+      </section>
+
+      <section id="disc-4">
+        <h2>4. No Service Level Agreement (SLA) & Uninterrupted Operation</h2>
+        <p>
+          The Service is provided strictly on an <strong>"AS-IS"</strong> and <strong>"AS-AVAILABLE"</strong> basis:
+        </p>
+        <ul>
+          <li><strong>No Uptime Guarantees:</strong> The Operator does not warrant that the Service will operate continuously, securely, or free from bugs, timeouts, network interruptions, or transmission errors.</li>
+          <li><strong>Upstream Model Unavailability:</strong> Upstream providers frequently alter rate limits, change response formats, invalidate cookies, or encounter downtime. The Operator disclaims all liability for failed requests or broken tool calls resulting from upstream changes.</li>
+          <li><strong>No Backup Obligations:</strong> The Service is not a persistent cloud archive. Local media and store files may be overwritten, purged, or deleted during updates without liability.</li>
+        </ul>
+      </section>
+
+      <section id="disc-5">
+        <h2>5. Explicit Third-Party Non-Affiliation & Trademark Notice</h2>
+        <div class="alert-box info">
+          <strong>INDEPENDENT OPEN-SOURCE STATUS:</strong>
+          <p style="margin-top:8px;">
+            Antigravity Proxy is an independent, community-developed open-source software project. <strong>It is NOT affiliated with, sponsored by, endorsed by, certified by, or officially associated with Google LLC, Alphabet Inc., Anthropic PBC, OpenAI Inc., or NVIDIA Corporation.</strong>
+          </p>
+        </div>
+        <p>All trademarks, registered marks, trade names, and product names referenced in the software or documentation belong strictly to their respective owners:</p>
+        <div class="provider-card">
+          <h4>Google LLC / Alphabet Inc.</h4>
+          <p>Google, Gemini, Imagen, Veo, Google Cloud, and Vertex AI are registered trademarks of Google LLC.</p>
+        </div>
+        <div class="provider-card">
+          <h4>Anthropic PBC</h4>
+          <p>Anthropic, Claude, Claude 3.5, and Claude 3.7 are registered trademarks of Anthropic PBC.</p>
+        </div>
+        <div class="provider-card">
+          <h4>OpenAI Inc. / OpenAI LLC</h4>
+          <p>OpenAI, GPT-4, GPT-4o, ChatGPT, and DALL-E are trademarks or registered trademarks of OpenAI Inc.</p>
+        </div>
+        <div class="provider-card">
+          <h4>NVIDIA Corporation</h4>
+          <p>NVIDIA, NVIDIA NIM, and NeMo are trademarks or registered trademarks of NVIDIA Corporation.</p>
+        </div>
+        <p style="margin-top:12px; font-size:13px; color:var(--text-muted);">
+          * Use of these brand names within this project is strictly for descriptive, nominative identification of supported API interfaces and protocols pursuant to fair use doctrine.
+        </p>
+      </section>
+
+      <section id="disc-6">
+        <h2>6. Mandatory Compliance with Upstream Provider Terms</h2>
+        <p>
+          You warrant that you will access third-party AI models only through legitimate, authorized credentials that you legally own or are authorized to utilize. You agree to strictly review and abide by:
+        </p>
+        <ul>
+          <li><a href="https://policies.google.com/terms" target="_blank" rel="noopener" style="color:var(--primary);">Google Terms of Service</a> and the <a href="https://policies.google.com/terms/generative-ai" target="_blank" rel="noopener" style="color:var(--primary);">Google Generative AI Additional Terms of Service</a>.</li>
+          <li><a href="https://cloud.google.com/terms" target="_blank" rel="noopener" style="color:var(--primary);">Google Cloud Platform Master Terms</a>.</li>
+          <li><a href="https://www.nvidia.com/en-us/about-nvidia/legal-info/" target="_blank" rel="noopener" style="color:var(--primary);">NVIDIA Developer Terms of Use</a>.</li>
+        </ul>
+        <p>
+          You acknowledge that upstream providers reserve the right to suspend or terminate accounts that violate their terms, and the Operator accepts zero liability for any provider actions taken against your accounts.
+        </p>
+      </section>
+
+      <section id="disc-7">
+        <h2>7. No Encouragement or Authorization of Unlawful Use</h2>
+        <p>
+          Nothing in the source code, documentation, examples, or tutorials of Antigravity Proxy shall be construed as encouraging, facilitating, or authorizing the violation of any law, copyright infringement, unauthorized access, or breach of third-party contracts.
+        </p>
+      </section>
+
+      <section id="disc-8">
+        <h2>8. Comprehensive Limitation of Liability</h2>
+        <div class="alert-box danger">
+          <strong>MAXIMUM STATUTORY LIMITATION OF LIABILITY:</strong>
+          <p style="margin-top:8px;">
+            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW IN INDIA AND UNDER INTERNATIONAL JURISDICTIONS:
+          </p>
+          <ul style="margin:8px 0 8px 18px;">
+            <li>IN NO EVENT SHALL THE OPERATOR, AUTHORS, OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES (INCLUDING DAMAGES FOR LOSS OF BUSINESS PROFITS, CLOUD BILLING CHARGES, SYSTEM DOWNTIME, LOSS OF CODE, CORRUPTION OF DATA, OR FAILURE TO ACHIEVE SPECIFIC COMPUTATIONAL RESULTS).</li>
+            <li>IN ALL CASES, THE TOTAL AGGREGATE LIABILITY OF THE OPERATOR ARISING UNDER CONTRACT, TORT (INCLUDING NEGLIGENCE), OR STATUTORY DUTY SHALL NOT EXCEED THE TOTAL AMOUNT PAID BY YOU TO THE OPERATOR SPECIFICALLY FOR THE USE OF THIS PROXY SOFTWARE IN THE PRECEDING TWELVE (12) MONTHS, OR INDIAN RUPEES ONE HUNDRED (INR ₹100), WHICHEVER IS LESS.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="disc-9">
+        <h2>9. Statutory Exceptions Where Liability Cannot Be Excluded</h2>
+        <p>
+          <strong>No False Claims of Immunity:</strong> The Operator acknowledges that certain consumer protection statutes, consumer protection laws (including the <strong>Consumer Protection Act, 2019</strong> of India), and foundational contract laws do not permit the blanket exclusion or limitation of certain categories of liability.
+        </p>
+        <p>Nothing in this Disclaimer purports to exclude or limit liability that cannot lawfully be excluded under applicable laws, including:</p>
+        <ul>
+          <li>Liability for death or personal injury resulting from proven gross negligence;</li>
+          <li>Liability for deliberate fraud or fraudulent misrepresentation;</li>
+          <li>Any non-waivable statutory obligation imposed on an intermediary or software developer by the Parliament of India or applicable state legislation.</li>
+        </ul>
+        <p>
+          If any court of competent jurisdiction determines that any limitation in this document is unenforceable, the remaining limitations shall remain in full force to the maximum extent permitted by law.
+        </p>
+      </section>
+
+      <section id="disc-10">
+        <h2>10. Independent Legal Counsel Recommendation</h2>
+        <p>
+          The legal documentation provided with this software (including the Terms of Service, Privacy Policy, Acceptable Use Policy, and this Disclaimer) is intended to provide a transparent, professional legal baseline.
+        </p>
+        <p>
+          Because organizational risk profiles, regulatory frameworks, and enterprise policies vary significantly across different deployment contexts, <strong>operators intending to deploy this proxy in commercial, multi-user, or institutional settings are strongly advised to obtain independent legal counsel licensed in India or their relevant operating jurisdiction</strong> before public deployment.
+        </p>
+        <div style="background:rgba(15,23,42,0.8); border:1px solid var(--card-border); padding:18px 22px; border-radius:10px; font-size:13.5px; margin-top:16px;">
+          <p style="margin-bottom:6px;"><strong>Legal Inquiries & Disclaimer Clarifications:</strong></p>
+          <p style="margin-bottom:6px;"><strong>Legal Desk:</strong> <span class="placeholder">[legal@yourdomain.com / Contact Email]</span></p>
+          <p style="margin-bottom:6px;"><strong>Operator / Entity:</strong> <span class="placeholder">[Operator Name / Legal Entity]</span></p>
+          <p style="margin-bottom:0;"><strong>Jurisdiction:</strong> <span class="placeholder">[City, State, PIN Code, India]</span></p>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Antigravity Proxy Project &bull; Open-Source Local Interoperability Gateway</p>
+    <p style="margin-top:10px;">
+      <a href="/terms">Terms of Service</a> &bull;
+      <a href="/privacy">Privacy Policy</a> &bull;
+      <a href="/acceptable-use">Acceptable Use Policy</a> &bull;
+      <a href="/disclaimer">Legal Disclaimer</a>
+    </p>
+    <p style="margin-top:6px; font-size:11.5px; color:#64748b;">
+      Governed by the laws of India. For educational, research, and developer evaluation use only.
+    </p>
+  </footer>
+
+</body>
+</html>

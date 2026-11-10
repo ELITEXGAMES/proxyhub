@@ -1,0 +1,50 @@
+{
+  "name": "antigravity-proxy",
+  "version": "1.0.0",
+  "description": "High-speed OpenAI & Anthropic compatible API proxy for Antigravity & NVIDIA NIM accounts with web dashboard",
+  "type": "module",
+  "main": "server.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ELITEXGAMES/proxyhub.git"
+  },
+  "homepage": "https://github.com/ELITEXGAMES/proxyhub#readme",
+  "bin": {
+    "anti": "./bin/anti.js",
+    "antigravity-proxy": "./bin/cli.js",
+    "anti-gravity-proxy": "./bin/cli.js",
+    "ag-proxy": "./bin/cli.js"
+  },
+  "files": [
+    "server.js",
+    "bin",
+    "src",
+    "public",
+    "package.json",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "cli": "node bin/cli.js",
+    "update": "node bin/cli.js update"
+  },
+  "keywords": [
+    "antigravity",
+    "gemini",
+    "gemini-proxy",
+    "openai-proxy",
+    "anthropic-proxy",
+    "nvidia-nim",
+    "llm-proxy",
+    "ai-proxy"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "express": "^4.21.0"
+  }
+}

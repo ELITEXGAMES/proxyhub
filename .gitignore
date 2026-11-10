@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Local user data & credentials (CRITICAL: never commit credentials)
+data/
+*.log
+*.pid
+.env
+.env.local
+*.tar.gz
+*.zip
+antigravity-proxy/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated Media
+public/media/*
+!public/media/.gitkeep
+
+

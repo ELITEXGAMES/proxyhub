@@ -1,0 +1,2548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity Proxy & Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #6366f1;
+      --success: #22c55e;
+      --error: #ef4444;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ───── Top Navbar ───── */
+    .navbar {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+    }
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    }
+    .brand span { color: var(--primary); }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      background: #0f172a;
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid #1e293b;
+    }
+    .nav-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .nav-tab:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    .nav-tab.active {
+      color: #fff;
+      background: var(--card-bg);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      border: 1px solid #334155;
+    }
+
+    .nav-right { display: flex; align-items: center; gap: 14px; }
+    .online-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #4ade80;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    /* ───── Hero Base URL ───── */
+    .hero-banner {
+      background: linear-gradient(180deg, #131c31 0%, var(--bg) 100%);
+      padding: 24px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .base-url-card {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .base-url-info { flex: 1; min-width: 0; }
+    .base-url-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; }
+    .base-url-code { font-family: 'Fira Code', 'Consolas', monospace; font-size: 14px; color: var(--primary); word-break: break-all; }
+    .base-url-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    /* ───── Buttons ───── */
+    .btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-primary { background: #0284c7; color: #fff; }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-outline { background: transparent; border-color: #334155; color: #cbd5e1; }
+    .btn-outline:hover { background: rgba(255,255,255,0.06); color: #fff; border-color: #475569; }
+    .btn-green { background: #15803d; color: #fff; }
+    .btn-green:hover { background: #166534; }
+    .btn-yellow { background: #b45309; color: #fff; }
+    .btn-yellow:hover { background: #92400e; }
+    .btn-red { background: #b91c1c; color: #fff; }
+    .btn-red:hover { background: #991b1b; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+    /* ───── Main Container ───── */
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      flex: 1;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .section-header h2 { font-size: 20px; font-weight: 700; color: #fff; }
+    .section-header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ───── Models Grid ───── */
+    .models-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .model-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+    .model-card:hover { border-color: #38bdf8; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+    .model-card.status-success { border-color: #22c55e; background: #0c1e17; }
+    .model-card.status-error { border-color: #ef4444; background: #221115; }
+    .model-card.status-testing { border-color: #eab308; background: #262112; }
+
+    .model-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+    .model-id { font-family: 'Fira Code', 'Consolas', monospace; font-size: 13px; font-weight: 700; color: var(--primary); }
+    .model-title { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    .model-meta { display: flex; align-items: center; justify-content: space-between; margin: 10px 0; }
+    .model-status { font-size: 12px; display: flex; align-items: center; gap: 6px; }
+    .model-response { background: #0b1120; border-radius: 6px; padding: 8px 10px; font-size: 12px; color: #cbd5e1; font-style: italic; margin-top: 8px; border-left: 3px solid #22c55e; word-break: break-word; }
+    .model-error-box { background: #0b1120; border-radius: 6px; padding: 8px 10px; font-size: 12px; color: #fca5a5; margin-top: 8px; border-left: 3px solid #ef4444; word-break: break-word; }
+    .model-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .model-actions .btn { flex: 1; justify-content: center; }
+
+    /* ───── Combos Styling ───── */
+    .combos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 18px;
+    }
+    .combo-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 18px;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .combo-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+    .combo-card.status-success { border-color: #22c55e; background: #0c1e17; }
+    .combo-card.status-error { border-color: #ef4444; background: #221115; }
+    .combo-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .combo-name { font-family: 'Fira Code', monospace; font-size: 15px; font-weight: 700; color: #38bdf8; }
+    .combo-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4; }
+
+    .combo-chain {
+      background: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .combo-step-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-family: 'Fira Code', monospace;
+    }
+    .combo-step-badge {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #1e3a5f;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .combo-step-arrow { text-align: center; color: var(--text-muted); font-size: 10px; margin: -3px 0; }
+
+    /* ───── Live Quota Cards ───── */
+    .gemini-pool-hero {
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      border-radius: 12px;
+      padding: 20px 22px;
+      margin-bottom: 20px;
+    }
+    .quota-account-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .quota-account-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+    }
+    .quota-models-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .quota-model-item {
+      background: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .quota-model-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .quota-model-name { font-weight: 600; font-size: 13px; color: #fff; }
+    .quota-model-pct { font-family: 'Fira Code', monospace; font-size: 12px; font-weight: 700; }
+    .quota-bar-bg {
+      background: #1e293b;
+      border-radius: 6px;
+      height: 8px;
+      width: 100%;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+    .quota-bar-fill { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+    .quota-bar-green { background: linear-gradient(90deg, #10b981, #059669); }
+    .quota-bar-yellow { background: linear-gradient(90deg, #f59e0b, #d97706); }
+    .quota-bar-red { background: linear-gradient(90deg, #ef4444, #b91c1c); }
+    .quota-bar-gated { background: #64748b; }
+    .quota-meta-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ───── Media Studio ───── */
+    .media-studio-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 820px;
+      margin: 0 auto;
+    }
+    .media-preview-box {
+      margin-top: 20px;
+      border-radius: 12px;
+      background: #0b1120;
+      border: 1px solid #1e293b;
+      padding: 20px;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .media-preview-box img {
+      max-width: 100%;
+      max-height: 480px;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    /* ───── Badges ───── */
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .badge-green { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+    .badge-red { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+    .badge-yellow { background: #78350f; color: #fde68a; border: 1px solid #d97706; }
+    .badge-neutral { background: #0b1120; color: var(--text-muted); border: 1px solid #223249; }
+    .badge-blue { background: #1e3a5f; color: #93c5fd; border: 1px solid #2563eb; }
+    .badge-purple { background: #4c1d95; color: #d8b4fe; border: 1px solid #7c3aed; }
+
+    /* ───── Tables ───── */
+    .table-container { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; overflow: hidden; margin-top: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #131d31; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--card-border); }
+    td { padding: 12px 16px; border-top: 1px solid #243247; font-size: 13px; vertical-align: middle; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .empty-row td { text-align: center; color: var(--text-muted); padding: 32px; font-style: italic; }
+
+    .account-pic { width: 32px; height: 32px; border-radius: 50%; vertical-align: middle; margin-right: 8px; border: 1px solid #475569; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .status-dot.on { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+    .status-dot.off { background: #ef4444; }
+
+    /* ───── Analytics Stat Cards ───── */
+    .stat-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 18px 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+    .stat-card-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; }
+    .stat-card-value { font-size: 28px; font-weight: 800; color: #fff; }
+    .stat-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .stat-card-sub span { color: #38bdf8; font-weight: 600; }
+
+    /* ───── Code Blocks ───── */
+    pre.code-block { background: #0b1120; border: 1px solid var(--card-border); border-radius: 8px; padding: 16px; font-size: 12px; line-height: 1.6; color: #94a3b8; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-family: 'Fira Code', 'Consolas', monospace; }
+
+    /* ───── Modal ───── */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.75); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal-overlay.show { display: flex; }
+    .modal-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 24px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+    .modal-box h3 { color: #38bdf8; margin-bottom: 12px; font-size: 18px; }
+    .modal-box .key-value { background: #0b1120; border: 1px solid var(--card-border); border-radius: 6px; padding: 12px 14px; font-family: 'Fira Code', 'Consolas', monospace; color: #22d3ee; font-size: 13px; word-break: break-all; margin: 12px 0; user-select: all; }
+    .modal-box .warn { color: #fbbf24; font-size: 12px; margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-control { width: 100%; background: #0b1120; border: 1px solid #334155; border-radius: 8px; color: #fff; padding: 10px 12px; font-size: 13px; outline: none; }
+    .form-control:focus { border-color: var(--primary); }
+
+    /* ───── Toast Notification ───── */
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #166534; color: #bbf7d0; padding: 12px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 200; box-shadow: 0 4px 16px rgba(0,0,0,0.4); border: 1px solid #22c55e; }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <!-- ───── Top Navbar ───── -->
+  <div class="navbar">
+    <a href="#" class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>Antigravity <span>Proxy</span></div>
+    </a>
+
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('models')">🤖 Models</button>
+      <button class="nav-tab" onclick="switchTab('combos')">🔀 Combos</button>
+      <button class="nav-tab" onclick="switchTab('quotas')">📊 Quotas & Analytics</button>
+      <button class="nav-tab" onclick="switchTab('accounts')">🔑 Accounts & Keys</button>
+      <button class="nav-tab" onclick="switchTab('media')">🎨 Generate Media</button>
+      <button class="nav-tab" onclick="switchTab('docs')">🔌 Connect & Docs</button>
+    </div>
+        
+
+    <div class="nav-right">
+        <button id="cookieStatusBtn" class="btn btn-outline btn-sm" onclick="openCookieModal()">🪙 Add Gemini Cookie</button>
+      <div class="online-indicator">
+        <div class="pulse-dot"></div>
+        <span id="gatewayStatus">Proxy Active</span>
+      </div>
+        
+    </div>
+        
+  </div>
+
+  <!-- ───── Base URL Hero Banner ───── -->
+  <div class="hero-banner">
+    <div class="base-url-card">
+      <div class="base-url-info">
+        <div class="base-url-label">Proxy Base URL (OpenAI & Anthropic Compatible)</div>
+        <div class="base-url-code" id="baseUrlDisplay">Loading...</div>
+      </div>
+        
+      <div class="base-url-actions">
+        <button class="btn btn-outline" onclick="copyText(document.getElementById('baseUrlDisplay').textContent, this)">📋 Copy Base URL</button>
+        <button class="btn btn-primary" onclick="switchTab('combos')">🔀 Manage Combos</button>
+      </div>
+        
+    </div>
+        
+  </div>
+
+  <!-- ───── Main Container ───── -->
+  <div class="container">
+
+    <!-- ========================================== -->
+    <!-- TAB 1: MODELS CATALOG & LIVE TESTER        -->
+    <!-- ========================================== -->
+    <div class="tab-content active" id="tab-models">
+      <div class="section-header">
+        <div>
+          <h2>🤖 Available Models & Live Tester</h2>
+          <p>Click <strong>Run Test</strong> on any model to verify live response — cards turn <strong style="color:#4ade80;">Green</strong> on success.</p>
+        </div>
+        
+        <div style="display:flex; gap:10px; align-items:center;">
+          <input type="text" id="modelSearch" placeholder="🔍 Search models..." style="background:#131d31; border:1px solid #334155; color:#e2e8f0; padding:8px 14px; border-radius:8px; font-size:13px; outline:none;" oninput="filterModels()">
+          <button class="btn btn-primary btn-sm" id="testAllBtn" onclick="testAllModels()">⚡ Test All Models</button>
+        </div>
+        
+      </div>
+        
+      <div class="models-grid" id="modelsGrid">
+        <div style="color:var(--text-muted); font-style:italic;">Loading models...</div>
+      </div>
+        
+    </div>
+        
+
+    <!-- ========================================== -->
+    <!-- TAB 2: MODEL COMBOS (FALLBACK ROUTING)     -->
+    <!-- ========================================== -->
+    <div class="tab-content" id="tab-combos">
+      <div class="section-header">
+        <div>
+          <h2>🔀 Model Combos & Smart Fallback Chains</h2>
+          <p>Group models across multiple Google accounts into a single name. If one model's quota is full or rate-limited, it automatically forwards the <strong>full conversation context</strong> to the next step without interruption!</p>
+        </div>
+        
+        <button class="btn btn-primary" onclick="openCreateComboModal()">+ Create New Combo</button>
+      </div>
+        
+
+      <div class="combos-grid" id="combosGrid">
+        <div style="color:var(--text-muted); font-style:italic;">Loading combos...</div>
+      </div>
+        
+    </div>
+        
+
+    <!-- ========================================== -->
+    <!-- TAB 3: QUOTAS & ANALYTICS                  -->
+    <!-- ========================================== -->
+    <div class="tab-content" id="tab-quotas">
+      <div class="section-header">
+        <div>
+          <h2>📊 Live Account Quotas & Usage</h2>
+          <p>Real-time quota percentage, remaining fractions, and reset timestamps across all connected Google accounts.</p>
+        </div>
+        
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-primary btn-sm" onclick="loadQuotas()">🔄 Refresh Live Quotas</button>
+          <button class="btn btn-outline btn-sm" onclick="clearAnalyticsData()">🗑️ Reset Analytics</button>
+        </div>
+        
+      </div>
+        
+
+      <!-- Live Quota Cards Container -->
+      <div id="quotasContainer">
+        <div style="color:var(--text-muted); font-style:italic;">Loading live quotas...</div>
+      </div>
+        
+
+      <!-- Analytics Section -->
+      <div style="margin-top: 36px;">
+        <h3 style="font-size:18px; color:#fff; margin-bottom:14px;">📈 Request & Token Analytics</h3>
+        <div class="stat-cards-grid">
+          <div class="stat-card">
+            <div class="stat-card-title">Total Requests</div>
+            <div class="stat-card-value" id="statTotalReqs">0</div>
+            <div class="stat-card-sub"><span id="statSuccessReqs">0</span> successful · <span id="statFailedReqs" style="color:#ef4444;">0</span> failed</div>
+          </div>
+        
+          <div class="stat-card">
+            <div class="stat-card-title">Total Tokens Processed</div>
+            <div class="stat-card-value" id="statTotalTokens">0</div>
+            <div class="stat-card-sub"><span id="statPromptTokens">0</span> prompt · <span id="statCompTokens">0</span> completion</div>
+          </div>
+        
+          <div class="stat-card">
+            <div class="stat-card-title">Success Rate</div>
+            <div class="stat-card-value" id="statSuccessRate">100%</div>
+            <div class="stat-card-sub">Active proxy uptime</div>
+          </div>
+        
+          <div class="stat-card">
+            <div class="stat-card-title">Avg Latency</div>
+            <div class="stat-card-value" id="statAvgLatency">—</div>
+            <div class="stat-card-sub">Across recent requests</div>
+          </div>
+        
+        </div>
+        
+
+        <!-- Model Breakdown Table -->
+        <div style="margin-bottom: 28px;">
+          <h4 style="font-size:14px; margin-bottom:10px; color:#fff;">Model Usage Breakdown</h4>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr><th>Model</th><th>Requests</th><th>Prompt Tokens</th><th>Completion Tokens</th><th>Total Tokens</th></tr>
+              </thead>
+              <tbody id="modelUsageBody">
+                <tr class="empty-row"><td colspan="5">No usage recorded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        
+        </div>
+        
+
+        <!-- Recent Requests Log -->
+        <div>
+          <h4 style="font-size:14px; margin-bottom:10px; color:#fff;">Recent Requests Activity Feed</h4>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr><th>Time</th><th>Model</th><th>Account</th><th>Tokens</th><th>Latency</th><th>Status</th></tr>
+              </thead>
+              <tbody id="recentRequestsBody">
+                <tr class="empty-row"><td colspan="6">No recent requests logged.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        
+        </div>
+        
+      </div>
+        
+    </div>
+        
+
+    <!-- ========================================== -->
+    <!-- TAB 4: ACCOUNTS & API KEYS                 -->
+    <!-- ========================================== -->
+    <div class="tab-content" id="tab-accounts">
+      <!-- Google Accounts Section -->
+      <div style="margin-bottom: 36px;">
+        <div class="section-header">
+          <div>
+            <h2>🔑 Connected Google Accounts</h2>
+            <p>Connect multiple accounts. In Combos, you can target specific accounts for each model in your fallback chain.</p>
+          </div>
+        
+          <a href="/auth/login" style="text-decoration:none;"><button class="btn btn-primary">+ Add Account (Google Login)</button></a>
+        </div>
+        
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr><th>Account</th><th>Project ID</th><th>Status</th><th>Added</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="accountsBody">
+              <tr class="empty-row"><td colspan="5">Loading accounts...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- NVIDIA NIM API Keys Section -->
+      <div style="margin-bottom: 36px;">
+        <div class="section-header">
+          <div>
+            <h2>🟢 NVIDIA NIM API Keys</h2>
+            <p>Connect your NVIDIA NIM API keys (<code>nvapi-...</code>). Mix Llama 3.3, Nemotron, DeepSeek R1, and Mixtral models into your smart Combos!</p>
+          </div>
+          <button class="btn btn-green" onclick="openNvidiaKeyModal()">+ Add NVIDIA NIM Key</button>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr><th>Key Name</th><th>Key</th><th>Status</th><th>Added</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="nvidiaKeysBody">
+              <tr class="empty-row"><td colspan="5">Loading NVIDIA NIM keys...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Gemini Web Cookies Section -->
+      <div style="margin-bottom: 36px;">
+        <div class="section-header">
+          <div>
+            <h2>🍪 Gemini Web Accounts (Cookies)</h2>
+            <p>Connect your Gemini Web session cookies (<code>__Secure-1PSID</code>) to access Gemini Web models (Flash, Pro, Thinking, Images, Video) and include them in Combos.</p>
+          </div>
+          <button class="btn btn-outline" onclick="openCookieModal()">+ Add Gemini Web Cookie</button>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr><th>Account / Label</th><th>Masked Cookie</th><th>Status</th><th>Added</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="geminiCookiesBody">
+              <tr class="empty-row"><td colspan="5">Loading cookies...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- API Keys Section -->
+      <div>
+        <div class="section-header">
+          <div>
+            <h2>🗝️ API Keys</h2>
+            <p>Use these API keys in Cursor, Claude Desktop, Continue, Cline, or OpenAI SDK clients.</p>
+          </div>
+        
+          <button class="btn btn-green" onclick="promptCreateKey()">+ Create API Key</button>
+        </div>
+        
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr><th>Key Name</th><th>Key</th><th>Created</th><th>Last Used</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="keysBody">
+              <tr class="empty-row"><td colspan="5">Loading API keys...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        
+      </div>
+        
+    </div>
+        
+
+    <!-- ========================================== -->
+    <!-- TAB 5: GENERATE MEDIA STUDIO               -->
+    <!-- ========================================== -->
+    <div class="tab-content" id="tab-media">
+      <div class="section-header">
+        <div>
+          <h2>🎨 Image & Video Generation Studio</h2>
+          <p>Generate clean images with <code>gemini-3.1-flash-image</code>. Images are saved locally on disk and served as fast, permanent URLs — <strong>zero raw Base64 clutter!</strong></p>
+        </div>
+        
+      </div>
+        
+
+      <div class="media-studio-box">
+        <div class="form-group">
+          <label>Prompt</label>
+          <textarea id="mediaPromptInput" class="form-control" rows="3" placeholder="A futuristic astronaut floating in a nebula, cinematic 8k lighting, cyberpunk aesthetic..."></textarea>
+        </div>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-size:12px; color:var(--text-muted);">Model: <strong style="color:var(--primary);">gemini-3.1-flash-image</strong></div>
+          <button class="btn btn-primary" id="generateMediaBtn" onclick="runGenerateMedia()">✨ Generate Image</button>
+        </div>
+        
+
+        <div class="media-preview-box" id="mediaPreviewBox">
+          <div style="color:var(--text-muted); font-size:13px;">Generated image will appear here directly rendered with its download link.</div>
+        </div>
+        
+      </div>
+        
+    </div>
+        
+
+    <!-- ========================================== -->
+    <!-- TAB 6: CONNECT & QUICKSTART DOCS           -->
+    <!-- ========================================== -->
+    <div class="tab-content" id="tab-docs">
+      <div class="section-header">
+        <div>
+          <h2>🔌 Connect Any App or SDK</h2>
+          <p>Compatible with Claude Desktop, Claude Code, Cursor, Continue, Cline, OpenAI SDK, and Anthropic SDK.</p>
+        </div>
+        
+      </div>
+        
+
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- Claude Desktop / Claude Code Card -->
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <h3 style="color:#fff; font-size:16px;">🤖 Claude Desktop & Claude Code Configuration</h3>
+            <button class="btn btn-sm btn-outline" onclick="copyText(document.getElementById('claudeEnvCode').textContent, this)">📋 Copy PowerShell</button>
+          </div>
+        
+          <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Run this in PowerShell to configure Claude to use your proxy with smart Combos:</p>
+          <pre class="code-block" id="claudeEnvCode">[Environment]::SetEnvironmentVariable("ANTHROPIC_BASE_URL", "http://localhost:4000", "User")
+[Environment]::SetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", "YOUR_API_KEY", "User")
+[Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", "", "User")
+[Environment]::SetEnvironmentVariable("ANTHROPIC_MODEL", "auto-fallback", "User")</pre>
+        </div>
+        
+
+        <!-- Cursor / Cline Card -->
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:20px;">
+          <h3 style="color:#fff; font-size:16px; margin-bottom:10px;">💻 Cursor / Continue / Cline Setup</h3>
+          <ul style="font-size:13px; color:var(--text); line-height:1.8; margin-left:20px;">
+            <li><strong>Base URL:</strong> <code style="color:var(--primary); font-family:monospace;">http://localhost:4000/v1</code></li>
+            <li><strong>API Key:</strong> Use any key created in the Accounts & Keys tab (e.g. <code>agp-...</code>)</li>
+            <li><strong>Model Name:</strong> Enter any Combo name (e.g. <code>auto-fallback</code>, <code>fast-coding</code>) or model ID (e.g. <code>gemini-3.8-flash-tiered</code>, <code>gemini-2.5-flash</code>)</li>
+          </ul>
+        </div>
+        
+
+        <!-- Python Code Card -->
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <h3 style="color:#fff; font-size:16px;">🐍 Python (OpenAI SDK)</h3>
+            <button class="btn btn-sm btn-outline" onclick="copyText(document.getElementById('pythonCode').textContent, this)">📋 Copy</button>
+          </div>
+        
+          <pre class="code-block" id="pythonCode">import openai
+
+client = openai.OpenAI(
+    base_url="http://localhost:4000/v1",
+    api_key="YOUR_API_KEY"
+)
+
+# You can use a Combo name like 'auto-fallback' for seamless failover!
+response = client.chat.completions.create(
+    model="auto-fallback",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+print(response.choices[0].message.content)</pre>
+        </div>
+        
+      </div>
+        
+    </div>
+        
+    <!-- ───── Footer & Legal Disclosures ───── -->
+    <footer style="margin-top:40px; padding:24px 0 32px; border-top:1px solid #1e293b; text-align:center; color:var(--text-muted); font-size:12px;">
+      <div style="display:flex; justify-content:center; gap:20px; flex-wrap:wrap; margin-bottom:12px;">
+        <a href="/terms" target="_blank" style="color:#94a3b8; text-decoration:none;">Terms of Service</a>
+        <span style="color:#334155;">•</span>
+        <a href="/privacy" target="_blank" style="color:#94a3b8; text-decoration:none;">Privacy Policy</a>
+        <span style="color:#334155;">•</span>
+        <a href="/acceptable-use" target="_blank" style="color:#94a3b8; text-decoration:none;">Acceptable Use Policy</a>
+        <span style="color:#334155;">•</span>
+        <a href="/disclaimer" target="_blank" style="color:#94a3b8; text-decoration:none;">Legal Disclaimer</a>
+      </div>
+      <p style="margin:0; color:#64748b; font-size:11px;">
+        Governed by Indian law (IT Act 2000, DPDPA 2023). For personal educational, research, and authorized developer use only. Not affiliated with Google LLC, Anthropic PBC, OpenAI Inc, or NVIDIA Corporation.
+      </p>
+    </footer>
+
+  </div>
+
+  <!-- ───── New Key Modal ───── -->
+  
+
+  <!-- ───── Cookie Input Modal ───── -->
+  <div class="modal-overlay" id="cookieModal">
+    <div class="modal-box" style="max-width:580px;">
+      <h3>🪙 Add Gemini Authentication Cookies</h3>
+      <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">
+        Google requires both session cookies (<code style="color:#22d3ee;">__Secure-1PSID</code> and <code style="color:#22d3ee;">__Secure-1PSIDTS</code>) to authenticate Gemini Web models and inject them into Combos.
+      </p>
+
+      <div class="form-group" style="margin-bottom:12px;">
+        <label for="cookieNameInput">Account / Cookie Label</label>
+        <input type="text" id="cookieNameInput" class="form-control" placeholder="e.g. personal, work, secondary" />
+      </div>
+
+      <!-- Mode Switcher Tabs -->
+      <div style="display:flex; gap:8px; margin-bottom:14px; border-bottom:1px solid #1e293b; padding-bottom:10px;">
+        <button type="button" id="cookieModeTab2Boxes" class="btn btn-sm btn-primary" onclick="setCookieInputMode('two-boxes')">🍪 Both Cookies (Recommended)</button>
+        <button type="button" id="cookieModeTabRaw" class="btn btn-sm btn-outline" onclick="setCookieInputMode('raw')">📝 Full String / cURL / Token</button>
+      </div>
+
+      <!-- Mode 1: Both Separate Cookies -->
+      <div id="cookieModeTwoBoxes">
+        <div class="form-group" style="margin-bottom:12px;">
+          <label for="cookiePsidInput" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>1️⃣ <strong>__Secure-1PSID</strong> <span style="color:#ef4444;">*</span></span>
+            <span style="font-size:11px; color:#22d3ee;">Primary Session (starts with g.a000...)</span>
+          </label>
+          <textarea id="cookiePsidInput" class="form-control" rows="2" placeholder="Paste __Secure-1PSID value here..." style="font-family:'Fira Code',monospace; font-size:12px; resize:vertical;" oninput="onCookiePsidInput()"></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px;">
+          <label for="cookiePsidtsInput" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>2️⃣ <strong>__Secure-1PSIDTS</strong> <span style="color:#ef4444;">*</span></span>
+            <span style="font-size:11px; color:#22d3ee;">Timestamp Token (starts with sidts-001...)</span>
+          </label>
+          <textarea id="cookiePsidtsInput" class="form-control" rows="2" placeholder="Paste __Secure-1PSIDTS value here..." style="font-family:'Fira Code',monospace; font-size:12px; resize:vertical;"></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label for="cookiePsidccInput" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>3️⃣ <strong>__Secure-1PSIDCC</strong> <span style="color:var(--text-muted); font-size:11px;">(Optional)</span></span>
+            <span style="font-size:11px; color:var(--text-muted);">Security Check Token</span>
+          </label>
+          <input type="text" id="cookiePsidccInput" class="form-control" placeholder="Paste __Secure-1PSIDCC value here (optional)" style="font-family:'Fira Code',monospace; font-size:12px;" />
+        </div>
+      </div>
+
+      <!-- Mode 2: Raw / Single Textarea -->
+      <div id="cookieModeRaw" style="display:none;">
+        <div class="form-group" style="margin-bottom:14px;">
+          <label for="cookieInput">Full Cookie String / JSON Export / API Key / OAuth Token</label>
+          <textarea id="cookieInput" class="form-control" rows="4" placeholder="Paste full cookie string, cURL Cookie header, JSON export from Cookie-Editor, or Google AIzaSy / ya29 token..." style="font-family:'Fira Code',monospace; font-size:12px; resize:vertical;"></textarea>
+        </div>
+      </div>
+
+      <div style="background:#0b1120; border:1px solid #1e293b; border-radius:8px; padding:12px; margin-bottom:14px;">
+        <p style="font-size:11px; color:var(--text-muted); margin-bottom:6px;">💡 <strong>Quick Steps to copy both cookies from Chrome/Edge/Brave:</strong></p>
+        <ol style="font-size:11px; color:var(--text-muted); margin-left:16px; line-height:1.7;">
+          <li>Open <a href="https://gemini.google.com" target="_blank" style="color:var(--primary);">gemini.google.com</a> and make sure you are logged in</li>
+          <li>Press <strong>F12</strong> (or right-click → Inspect) → click the <strong>Application</strong> tab (or <strong>Storage</strong> in Firefox)</li>
+          <li>In the left sidebar: Expand <strong>Cookies</strong> → click <code>https://gemini.google.com</code></li>
+          <li>Click <code style="color:#22d3ee;">__Secure-1PSID</code> in the table, copy its <strong>Cookie Value</strong> and paste in Box 1</li>
+          <li>Click <code style="color:#22d3ee;">__Secure-1PSIDTS</code> in the table, copy its <strong>Cookie Value</strong> and paste in Box 2</li>
+        </ol>
+      </div>
+
+      <div id="cookieCurrentStatus" style="font-size:12px; margin-bottom:12px;"></div>
+      <div id="cookieTestResult" style="font-size:12px; margin-bottom:12px; display:none; padding:8px 12px; border-radius:6px;"></div>
+
+      <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:12px; line-height:1.5;">
+        By saving session cookies, you confirm that you are authorized to use this session and agree to our <a href="/terms" target="_blank" style="color:var(--primary);">Terms of Service</a> and <a href="/acceptable-use" target="_blank" style="color:var(--primary);">Acceptable Use Policy</a>.
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-red btn-sm" onclick="removeGeminiCookie(); closeCookieModal();" style="margin-right:auto;">🗑️ Clear Current</button>
+        <button type="button" class="btn btn-outline" id="btnTestCookie" onclick="testCurrentCookieInput()">🧪 Test Cookie</button>
+        <button class="btn btn-outline" onclick="closeCookieModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveGeminiCookie()">💾 Save Cookie</button>
+      </div>
+    </div>
+  </div>
+  <!-- ───── NVIDIA NIM Key Modal ───── -->
+  <div class="modal-overlay" id="nvidiaKeyModal">
+    <div class="modal-box" style="max-width:540px;">
+      <h3>🟢 Add NVIDIA NIM API Key</h3>
+      <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">
+        Enter your NVIDIA NIM API key (starts with <code style="color:#22c55e;">nvapi-</code>). You can get a free key from <a href="https://build.nvidia.com" target="_blank" style="color:var(--primary);">build.nvidia.com</a>.
+      </p>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label for="nvidiaKeyNameInput">Key Name / Label</label>
+        <input type="text" id="nvidiaKeyNameInput" class="form-control" placeholder="e.g. Primary NIM Key, Free Tier Key" />
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label for="nvidiaKeyValueInput" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>NVIDIA NIM API Key <span style="color:#ef4444;">*</span></span>
+          <span style="font-size:11px; color:#22c55e; cursor:pointer;" onclick="toggleNvidiaKeyVisibility()">👁️ Show/Hide</span>
+        </label>
+        <input type="password" id="nvidiaKeyValueInput" class="form-control" placeholder="nvapi-..." style="font-family:'Fira Code',monospace;" oninput="onNvidiaKeyInput()" />
+      </div>
+      <div id="nvidiaKeyTestResult" style="display:none; margin-bottom:12px; font-size:12px; padding:10px 12px; border-radius:8px; line-height:1.5;"></div>
+      <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:12px; line-height:1.5;">
+        By adding an NVIDIA NIM key, you confirm compliance with NVIDIA's Developer Terms and our <a href="/acceptable-use" target="_blank" style="color:var(--primary);">Acceptable Use Policy</a>.
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeNvidiaKeyModal()">Cancel</button>
+        <button type="button" class="btn btn-outline" id="btnTestNvidiaKey" onclick="testCurrentNvidiaKeyInput()">🧪 Test & Load Models</button>
+        <button class="btn btn-green" onclick="saveNvidiaKey()">💾 Save Key</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="newKeyModal">
+    <div class="modal-box">
+      <h3>🔐 New API Key Created</h3>
+      <p style="color:var(--text-muted); font-size:13px;">Copy this key now. For security, it will only be shown once in full!</p>
+      <div class="key-value" id="newKeyValue">—</div>
+      <div class="warn">⚠️ Store it safely. Anyone with this key can access your Antigravity models.</div>
+      <div style="font-size:11.5px; color:var(--text-muted); margin:10px 0 12px; line-height:1.5;">
+        API access is governed by the <a href="/terms" target="_blank" style="color:var(--primary);">Terms of Service</a>, <a href="/privacy" target="_blank" style="color:var(--primary);">Privacy Policy</a>, and <a href="/acceptable-use" target="_blank" style="color:var(--primary);">Acceptable Use Policy</a>.
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="copyText(document.getElementById('newKeyValue').textContent, this)">📋 Copy Key</button>
+        <button class="btn btn-outline" onclick="closeKeyModal()">Done</button>
+      </div>
+        
+    </div>
+        
+  </div>
+
+  <!-- ───── Create/Edit Combo Modal ───── -->
+  <div class="modal-overlay" id="comboModal">
+    <div class="modal-box">
+      <h3 id="comboModalTitle">🔀 Create Model Combo</h3>
+      <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">Build a prioritized fallback chain. If Step 1 hits quota or rate limit, Step 2 immediately continues with full context preserved.</p>
+
+      <div class="form-group">
+        <label>Combo Name (slug used as model name in clients)</label>
+        <input type="text" id="comboNameInput" class="form-control" placeholder="e.g. coding-chain, fast-fallback, ultra-combo">
+      </div>
+        
+
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="comboDescInput" class="form-control" placeholder="e.g. Fast response with Pro fallback">
+      </div>
+        
+
+      <div class="form-group">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="margin:0;">Fallback Steps Order (Top to Bottom)</label>
+          <button class="btn btn-outline btn-sm" onclick="addComboStepRow()">+ Add Step</button>
+        </div>
+        
+        <div id="comboStepsList" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+        
+
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeComboModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCurrentCombo()">💾 Save Combo</button>
+      </div>
+        
+    </div>
+        
+  </div>
+
+  <!-- ───── Toast ───── -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const BASE = window.location.origin;
+    const API_BASE = BASE + '/v1';
+    document.getElementById('baseUrlDisplay').textContent = API_BASE;
+
+    let allModels = [];
+    let allAccounts = [];
+    let allNvidiaKeys = [];
+    let allNvidiaModels = [];
+    let allGeminiCookies = [];
+    let allCombos = [];
+
+    // ───── Tab Switching ─────
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+      const activeContent = document.getElementById('tab-' + tabId);
+      if (activeContent) activeContent.classList.add('active');
+
+      const tabs = document.querySelectorAll('.nav-tab');
+      const map = { models: 0, combos: 1, quotas: 2, accounts: 3, media: 4, docs: 5 };
+      if (map[tabId] !== undefined) tabs[map[tabId]].classList.add('active');
+
+      if (tabId === 'quotas') {
+        loadQuotas();
+        loadAnalytics();
+      } else if (tabId === 'combos') {
+        loadCombos();
+      }
+    }
+
+    // ───── Toast Notification ─────
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        if (btn) {
+          const orig = btn.textContent;
+          btn.textContent = '✅ Copied!';
+          setTimeout(() => { btn.textContent = orig; }, 1500);
+        }
+        showToast('📋 Copied: ' + text.slice(0, 32));
+      });
+    }
+
+    // ───── Fetch Helper ─────
+    function api(path, opts = {}) {
+      opts.headers = opts.headers || {};
+      opts.headers['Content-Type'] = 'application/json';
+      return fetch(path, opts).then(resp => {
+        if (!resp.ok && resp.status >= 500) {
+          return resp.json().catch(() => ({ error: { message: 'HTTP error ' + resp.status } }));
+        }
+        return resp.json();
+      });
+    }
+
+    // ───── Models Catalog ─────
+    function loadModels() {
+      api('/api/models').then(res => {
+        if (res.data && Array.isArray(res.data)) {
+          allModels = res.data;
+          renderModels(allModels);
+        } else {
+          throw new Error(res.error?.message || 'Invalid models data');
+        }
+      }).catch(err => {
+        document.getElementById('modelsGrid').innerHTML = '<div style="color:#ef4444; padding: 12px; display: flex; align-items: center; gap: 8px;"><span>⚠️ Failed to load models list.</span> <button class="btn btn-sm btn-outline" onclick="loadModels()">🔄 Retry</button></div>';
+      });
+    }
+
+    function renderModels(models) {
+      const grid = document.getElementById('modelsGrid');
+      if (!models || models.length === 0) {
+        grid.innerHTML = '<div style="color:var(--text-muted); font-style:italic;">No matching models found.</div>';
+        return;
+      }
+      grid.innerHTML = '';
+      models.forEach(m => {
+        const card = document.createElement('div');
+        card.className = 'model-card';
+        card.id = 'model-card-' + m.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+        let catBadge = 'badge-blue';
+        if (m.category === 'Anthropic') catBadge = 'badge-purple';
+        else if (m.category === 'Combos') catBadge = 'badge-yellow';
+        else if (m.category === 'Open Source') catBadge = 'badge-neutral';
+        else if (m.category === 'NVIDIA NIM') catBadge = 'badge-green';
+
+        card.innerHTML = `
+          <div>
+            <div class="model-top">
+              <div>
+                <div class="model-id">${m.id}</div>
+                <div class="model-title">${m.name || m.id}</div>
+              </div>
+        
+              <span class="badge ${catBadge}">${m.category || 'Model'}</span>
+            </div>
+        
+            <div class="model-meta">
+              <span class="model-status" id="status-${card.id}">
+                <span class="badge badge-neutral">⚪ Ready</span>
+              </span>
+              <button class="btn btn-sm btn-outline" onclick="copyText('${m.id}', this)" title="Copy model name">📋 Copy</button>
+            </div>
+        
+          </div>
+        
+          <div id="details-${card.id}"></div>
+          <div class="model-actions">
+            <button class="btn btn-sm btn-primary" id="btn-${card.id}" onclick="runTestModel('${m.id}', '${card.id}')">
+              ▶ Run Test
+            </button>
+          </div>
+        
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function filterModels() {
+      const q = document.getElementById('modelSearch').value.toLowerCase();
+      const filtered = allModels.filter(m => m.id.toLowerCase().includes(q) || (m.name && m.name.toLowerCase().includes(q)));
+      renderModels(filtered);
+    }
+
+    async function runTestModel(modelId, cardDomId) {
+      const card = document.getElementById(cardDomId);
+      const statusEl = document.getElementById('status-' + cardDomId);
+      const detailsEl = document.getElementById('details-' + cardDomId);
+      const btn = document.getElementById('btn-' + cardDomId);
+
+      card.className = 'model-card status-testing';
+      statusEl.innerHTML = '<span class="badge badge-yellow">⏳ Testing...</span>';
+      detailsEl.innerHTML = '';
+      btn.disabled = true;
+
+      try {
+        const res = await api('/api/models/test', {
+          method: 'POST',
+          body: JSON.stringify({ model: modelId }),
+        });
+
+        if (res.ok) {
+          card.className = 'model-card status-success';
+          statusEl.innerHTML = `<span class="badge badge-green">🟢 Passed (${res.latencyMs}ms)</span>`;
+          detailsEl.innerHTML = `<div class="model-response">“${res.reply}”</div>`;
+          btn.className = 'btn btn-sm btn-green';
+          btn.textContent = '✅ Retest';
+          showToast(`✅ ${modelId} passed in ${res.latencyMs}ms!`);
+        } else {
+          card.className = 'model-card status-error';
+          statusEl.innerHTML = `<span class="badge badge-red">❌ Failed (${res.latencyMs || 0}ms)</span>`;
+          let errMsg = res.error || 'Request failed';
+          detailsEl.innerHTML = `<div class="model-error-box">⚠️ ${errMsg}</div>`;
+          btn.className = 'btn btn-sm btn-red';
+          btn.textContent = '🔄 Retry';
+        }
+      } catch (err) {
+        card.className = 'model-card status-error';
+        statusEl.innerHTML = '<span class="badge badge-red">❌ Network Error</span>';
+        detailsEl.innerHTML = `<div class="model-error-box">${err.message}</div>`;
+        btn.className = 'btn btn-sm btn-red';
+        btn.textContent = '🔄 Retry';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function testAllModels() {
+      const btn = document.getElementById('testAllBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Testing All...';
+      for (const m of allModels) {
+        const domId = 'model-card-' + m.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+        if (document.getElementById(domId)) {
+          await runTestModel(m.id, domId);
+        }
+      }
+      btn.disabled = false;
+      btn.textContent = '⚡ Test All Models';
+      showToast('🎉 All model tests completed!');
+    }
+
+    // ───── Combos Management ─────
+    function loadCombos() {
+      api('/api/combos').then(data => {
+        allCombos = Array.isArray(data) ? data : [];
+        renderCombos(allCombos);
+      }).catch(err => {
+        document.getElementById('combosGrid').innerHTML = '<div style="color:#ef4444;">Failed to load combos.</div>';
+      });
+    }
+
+    function renderCombos(combos) {
+      const grid = document.getElementById('combosGrid');
+      if (!combos || combos.length === 0) {
+        grid.innerHTML = '<div style="color:var(--text-muted); font-style:italic;">No combos defined. Click "+ Create New Combo" to make one.</div>';
+        return;
+      }
+      grid.innerHTML = '';
+      combos.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'combo-card';
+        card.id = 'combo-card-' + c.id;
+
+        const stepsHtml = (c.steps || []).map((s, idx) => {
+          let accLabel = 'Auto (Any)';
+          let isNvidia = false;
+          let isCookie = false;
+          if (s.accountId && s.accountId.startsWith('nvidia:')) {
+            isNvidia = true;
+            const keyId = s.accountId.slice(7);
+            const nimKey = allNvidiaKeys.find(k => k.id === keyId);
+            accLabel = nimKey ? `NIM: ${nimKey.name}` : 'NIM: Any Key';
+          } else if (s.accountId && s.accountId.startsWith('cookie:')) {
+            isCookie = true;
+            const cId = s.accountId.slice(7);
+            const cObj = (allGeminiCookies || []).find(c => c.id === cId);
+            accLabel = cObj ? `Cookie: ${cObj.name}` : 'Cookie: Any';
+          } else if (s.model && s.model.startsWith('gemini-web-')) {
+            isCookie = true;
+            accLabel = 'Gemini Web Cookie';
+          } else if (s.model && (s.model.startsWith('meta/') || s.model.startsWith('nvidia/') || s.model.startsWith('deepseek') || s.model.startsWith('mistralai/') || s.model.startsWith('qwen/'))) {
+            isNvidia = true;
+            accLabel = 'NVIDIA NIM';
+          } else {
+            const accObj = allAccounts.find(a => a.id === s.accountId || a.email === s.accountId);
+            accLabel = accObj ? accObj.email.split('@')[0] : (s.accountId ? s.accountId : 'Auto (Any Google)');
+          }
+          const isPrimary = idx === 0;
+          const badgeColor = isCookie ? 'badge-yellow' : (isNvidia ? 'badge-green' : (isPrimary ? 'badge-green' : 'badge-blue'));
+          const arrow = idx < c.steps.length - 1 ? '<div class="combo-step-arrow">▼ fallback</div>' : '';
+          return `
+            <div class="combo-step-item">
+              <span class="badge ${badgeColor}" style="font-size:10px; padding:2px 6px;">${isPrimary ? '1 (Primary)' : (idx + 1) + ' (Fallback)'}</span>
+              <span style="color:#fff; font-weight:600; font-size:13px;">${s.model}</span>
+              <span style="color:var(--text-muted); font-size:11px;">(${accLabel})</span>
+            </div>
+            ${arrow}
+          `;
+        }).join('');
+
+        card.innerHTML = `
+          <div>
+            <div class="combo-header">
+              <div class="combo-name">🔀 ${c.name}</div>
+              <button class="btn btn-sm btn-outline" onclick="copyText('${c.name}', this)">📋 Copy Name</button>
+            </div>
+        
+            <div class="combo-desc">${c.description || 'Seamless contextual fallback chain.'}</div>
+            <div class="combo-chain">${stepsHtml}</div>
+            <div id="combo-details-${c.id}"></div>
+          </div>
+        
+          <div style="display:flex; gap:8px; margin-top:14px;">
+            <button class="btn btn-sm btn-primary" style="flex:2;" id="combo-btn-${c.id}" onclick="runTestCombo('${c.name}', '${c.id}')">⚡ Test Combo</button>
+            <button class="btn btn-sm btn-outline" style="flex:1;" onclick="editCombo('${c.id}')">✏️ Edit</button>
+            <button class="btn btn-sm btn-red" onclick="deleteComboItem('${c.id}')">🗑️</button>
+          </div>
+        
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    async function runTestCombo(comboName, comboId) {
+      const card = document.getElementById('combo-card-' + comboId);
+      const btn = document.getElementById('combo-btn-' + comboId);
+      const detailsEl = document.getElementById('combo-details-' + comboId);
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Testing Chain...';
+      detailsEl.innerHTML = '';
+
+      try {
+        const res = await api('/api/combos/test', {
+          method: 'POST',
+          body: JSON.stringify({ name: comboName }),
+        });
+
+        if (res.ok) {
+          card.className = 'combo-card status-success';
+          const modelUsed = res.modelUsed || 'Primary Model';
+          const accEmail = res.accountEmail && res.accountEmail !== 'default' ? ` on ${res.accountEmail}` : '';
+          const stepInfo = res.stepsAttempted ? ` (Step ${res.stepsAttempted}/${res.totalSteps})` : '';
+          detailsEl.innerHTML = `
+            <div style="margin-top:10px; padding:10px 12px; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.3); border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="color:#10b981; font-weight:700; font-size:12px;">✅ Passed${stepInfo}</span>
+                <span class="badge badge-green">${res.latencyMs}ms</span>
+              </div>
+        
+              <div style="font-size:12px; color:#e2e8f0;">Responded by: <strong>${modelUsed}</strong>${accEmail}</div>
+              <div class="model-response" style="margin-top:6px;">“${res.reply}”</div>
+            </div>
+        
+          `;
+          btn.className = 'btn btn-sm btn-green';
+          btn.textContent = '✅ Retest';
+          showToast(`✅ Combo "${comboName}" passed in ${res.latencyMs}ms!`);
+        } else {
+          card.className = 'combo-card status-error';
+          detailsEl.innerHTML = `<div class="model-error-box">⚠️ ${res.error || 'Failed'}</div>`;
+          btn.className = 'btn btn-sm btn-red';
+          btn.textContent = '🔄 Retry';
+        }
+      } catch (err) {
+        card.className = 'combo-card status-error';
+        detailsEl.innerHTML = `<div class="model-error-box">${err.message}</div>`;
+        btn.className = 'btn btn-sm btn-red';
+        btn.textContent = '🔄 Retry';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function openCreateComboModal() {
+      document.getElementById('comboModalTitle').textContent = '🔀 Create Model Combo';
+      const nameInput = document.getElementById('comboNameInput');
+      nameInput.value = '';
+      nameInput.removeAttribute('data-combo-id');
+      document.getElementById('comboDescInput').value = '';
+      document.getElementById('comboStepsList').innerHTML = '';
+      addComboStepRow('gemini-2.5-flash');
+      addComboStepRow('gemini-3.8-flash-tiered');
+      addComboStepRow('gemini-2.5-pro');
+      document.getElementById('comboModal').classList.add('show');
+    }
+
+    function editCombo(comboId) {
+      const combo = allCombos.find(c => c.id === comboId);
+      if (!combo) return;
+      document.getElementById('comboModalTitle').textContent = `✏️ Edit Combo: ${combo.name}`;
+      const nameInput = document.getElementById('comboNameInput');
+      nameInput.value = combo.name;
+      nameInput.setAttribute('data-combo-id', combo.id);
+      document.getElementById('comboDescInput').value = combo.description || '';
+      const list = document.getElementById('comboStepsList');
+      list.innerHTML = '';
+      if (combo.steps && combo.steps.length > 0) {
+        combo.steps.forEach(s => addComboStepRow(s.model, s.accountId));
+      } else {
+        addComboStepRow('gemini-2.5-flash');
+      }
+      document.getElementById('comboModal').classList.add('show');
+    }
+
+    function closeComboModal() {
+      document.getElementById('comboModal').classList.remove('show');
+    }
+
+    function moveStepRow(btn, direction) {
+      const row = btn.closest('.combo-step-editor-row');
+      if (!row) return;
+      if (direction === -1 && row.previousElementSibling) {
+        row.parentNode.insertBefore(row, row.previousElementSibling);
+      } else if (direction === 1 && row.nextElementSibling) {
+        row.parentNode.insertBefore(row.nextElementSibling, row);
+      }
+      updateStepRowBadges();
+    }
+
+    function removeStepRow(btn) {
+      const row = btn.closest('.combo-step-editor-row');
+      if (row) {
+        row.remove();
+        updateStepRowBadges();
+      }
+    }
+
+    function updateStepRowBadges() {
+      const rows = document.querySelectorAll('#comboStepsList .combo-step-editor-row');
+      rows.forEach((row, idx) => {
+        const badge = row.querySelector('.combo-step-number');
+        if (badge) {
+          badge.textContent = idx === 0 ? 'Step 1 (Primary)' : `Step ${idx + 1} (Fallback)`;
+          badge.className = idx === 0 ? 'combo-step-number badge badge-green' : 'combo-step-number badge badge-blue';
+        }
+      });
+    }
+
+    function addComboStepRow(defaultModel = 'gemini-2.5-flash', defaultAccountId = '') {
+      const list = document.getElementById('comboStepsList');
+      const row = document.createElement('div');
+      row.className = 'combo-step-editor-row';
+      row.style.cssText = 'display:flex; gap:8px; align-items:center; background:#0b1120; padding:10px 12px; border-radius:8px; border:1px solid #1e293b; margin-bottom:8px;';
+
+      const accountOptions = [
+        '<optgroup label="Google Antigravity Accounts">',
+        '<option value="">Auto (Any Google Account)</option>',
+        ...allAccounts.map(a => `<option value="${a.id}" ${a.id === defaultAccountId || a.email === defaultAccountId ? 'selected' : ''}>${a.email}</option>`),
+        '</optgroup>',
+        '<optgroup label="🍪 Gemini Web Accounts (Cookies)">',
+        `<option value="cookie:auto" ${defaultAccountId === 'cookie:auto' ? 'selected' : ''}>Auto (Any Active Cookie)</option>`,
+        ...(allGeminiCookies || []).map(c => `<option value="cookie:${c.id}" ${defaultAccountId === 'cookie:' + c.id ? 'selected' : ''}>${c.name} (${c.cookie})</option>`),
+        '</optgroup>',
+        '<optgroup label="🟢 NVIDIA NIM Keys">',
+        `<option value="nvidia:auto" ${defaultAccountId === 'nvidia:auto' ? 'selected' : ''}>Auto (Round-robin Any NIM Key)</option>`,
+        ...allNvidiaKeys.map(k => `<option value="nvidia:${k.id}" ${defaultAccountId === 'nvidia:' + k.id ? 'selected' : ''}>${k.name} (${k.key})</option>`),
+        '</optgroup>'
+      ].join('');
+
+      const modelOptGroups = `
+        <optgroup label="🎨 Image Generation Models">
+          <option value="gemini-3.1-flash-image" ${defaultModel === 'gemini-3.1-flash-image' ? 'selected' : ''}>Gemini 3.1 Flash Image (Imagen 3)</option>
+          <option value="imagen-3.0-generate-002" ${defaultModel === 'imagen-3.0-generate-002' ? 'selected' : ''}>Imagen 3 (Fast Quality)</option>
+          <option value="dall-e-3" ${defaultModel === 'dall-e-3' ? 'selected' : ''}>DALL-E 3 (OpenAI Compatible)</option>
+          <option value="dall-e-2" ${defaultModel === 'dall-e-2' ? 'selected' : ''}>DALL-E 2</option>
+          <option value="gemini-web-image" ${defaultModel === 'gemini-web-image' ? 'selected' : ''}>Gemini Web Imagen 3</option>
+        </optgroup>
+        <optgroup label="🎥 Video Generation Models">
+          <option value="gemini-3.1-flash-video" ${defaultModel === 'gemini-3.1-flash-video' ? 'selected' : ''}>Gemini 3.1 Flash Video</option>
+          <option value="veo-2" ${defaultModel === 'veo-2' ? 'selected' : ''}>Google Veo 2 (Video Gen)</option>
+          <option value="veo-2.0-generate-001" ${defaultModel === 'veo-2.0-generate-001' ? 'selected' : ''}>Veo 2.0 HD</option>
+          <option value="gemini-web-video" ${defaultModel === 'gemini-web-video' ? 'selected' : ''}>Gemini Web Veo 2</option>
+        </optgroup>
+        <optgroup label="⚡ Fast Text & Coding (78% Quota)">
+          <option value="gemini-2.5-flash" ${defaultModel === 'gemini-2.5-flash' ? 'selected' : ''}>Gemini 2.5 Flash (Ultra Fast)</option>
+          <option value="gemini-3.8-flash-high" ${defaultModel === 'gemini-3.8-flash-high' ? 'selected' : ''}>Gemini 3.8 Flash High</option>
+          <option value="gemini-3.8-flash-medium" ${defaultModel === 'gemini-3.8-flash-medium' ? 'selected' : ''}>Gemini 3.8 Flash Medium</option>
+          <option value="gemini-3.8-flash-low" ${defaultModel === 'gemini-3.8-flash-low' ? 'selected' : ''}>Gemini 3.8 Flash Low</option>
+          <option value="gemini-3.5-flash-lite" ${defaultModel === 'gemini-3.5-flash-lite' ? 'selected' : ''}>Gemini 3.5 Flash Lite</option>
+          <option value="gemini-3.1-flash-lite" ${defaultModel === 'gemini-3.1-flash-lite' ? 'selected' : ''}>Gemini 3.1 Flash Lite</option>
+          <option value="gemini-3-flash" ${defaultModel === 'gemini-3-flash' ? 'selected' : ''}>Gemini 3.0 Flash</option>
+        </optgroup>
+        <optgroup label="🧠 Deep Reasoning & Pro">
+          <option value="gemini-3.8-flash-tiered" ${defaultModel === 'gemini-3.8-flash-tiered' ? 'selected' : ''}>Gemini 3.8 Flash (Tiered)</option>
+          <option value="gemini-2.5-pro" ${defaultModel === 'gemini-2.5-pro' ? 'selected' : ''}>Gemini 2.5 Pro</option>
+          <option value="gemini-2.0-flash" ${defaultModel === 'gemini-2.0-flash' ? 'selected' : ''}>Gemini 2.0 Flash</option>
+          <option value="gemini-2.5-flash-thinking" ${defaultModel === 'gemini-2.5-flash-thinking' ? 'selected' : ''}>Gemini 2.5 Flash Thinking</option>
+        </optgroup>
+        <optgroup label="🟣 Anthropic Claude Models">
+          <option value="claude-3-7-sonnet" ${defaultModel === 'claude-3-7-sonnet' ? 'selected' : ''}>Claude 3.7 Sonnet</option>
+          <option value="claude-3-5-sonnet" ${defaultModel === 'claude-3-5-sonnet' ? 'selected' : ''}>Claude 3.5 Sonnet</option>
+          <option value="claude-3-5-haiku-20241022" ${defaultModel === 'claude-3-5-haiku-20241022' ? 'selected' : ''}>Claude 3.5 Haiku</option>
+          <option value="claude-3-opus" ${defaultModel === 'claude-3-opus' ? 'selected' : ''}>Claude 3 Opus</option>
+          <option value="claude-sonnet-4-6" ${defaultModel === 'claude-sonnet-4-6' ? 'selected' : ''}>Claude Sonnet 4.6 (Thinking)</option>
+          <option value="claude-opus-4-6-thinking" ${defaultModel === 'claude-opus-4-6-thinking' ? 'selected' : ''}>Claude Opus 4.6 (Thinking)</option>
+        </optgroup>
+        <optgroup label="🟢 OpenAI Models">
+          <option value="gpt-4o" ${defaultModel === 'gpt-4o' ? 'selected' : ''}>GPT-4o</option>
+          <option value="gpt-4o-mini" ${defaultModel === 'gpt-4o-mini' ? 'selected' : ''}>GPT-4o Mini</option>
+          <option value="gpt-3.5-turbo" ${defaultModel === 'gpt-3.5-turbo' ? 'selected' : ''}>GPT-3.5 Turbo</option>
+        </optgroup>
+        <optgroup label="🍪 Gemini Web Models">
+          <option value="gemini-web-flash" ${defaultModel === 'gemini-web-flash' ? 'selected' : ''}>Gemini Web Flash (Fast)</option>
+          <option value="gemini-web-pro" ${defaultModel === 'gemini-web-pro' ? 'selected' : ''}>Gemini Web Pro (Deep Reasoning)</option>
+          <option value="gemini-web-thinking" ${defaultModel === 'gemini-web-thinking' ? 'selected' : ''}>Gemini Web Thinking (Extended)</option>
+          <option value="gemini-web-search" ${defaultModel === 'gemini-web-search' ? 'selected' : ''}>Gemini Web Grounded (Live Search)</option>
+        </optgroup>
+        <optgroup label="🟢 NVIDIA NIM Models">
+          <option value="deepseek-ai/deepseek-r1" ${defaultModel === 'deepseek-ai/deepseek-r1' ? 'selected' : ''}>DeepSeek R1 (NIM)</option>
+          <option value="deepseek-ai/deepseek-v3" ${defaultModel === 'deepseek-ai/deepseek-v3' ? 'selected' : ''}>DeepSeek V3 (NIM)</option>
+          <option value="meta/llama-3.3-70b-instruct" ${defaultModel === 'meta/llama-3.3-70b-instruct' ? 'selected' : ''}>Llama 3.3 70B Instruct (NIM)</option>
+          <option value="meta/llama-3.1-405b-instruct" ${defaultModel === 'meta/llama-3.1-405b-instruct' ? 'selected' : ''}>Llama 3.1 405B Instruct (NIM)</option>
+          <option value="meta/llama-3.1-70b-instruct" ${defaultModel === 'meta/llama-3.1-70b-instruct' ? 'selected' : ''}>Llama 3.1 70B Instruct (NIM)</option>
+          <option value="meta/llama-3.1-8b-instruct" ${defaultModel === 'meta/llama-3.1-8b-instruct' ? 'selected' : ''}>Llama 3.1 8B Instruct (NIM)</option>
+          <option value="nvidia/llama-3.1-nemotron-70b-instruct" ${defaultModel === 'nvidia/llama-3.1-nemotron-70b-instruct' ? 'selected' : ''}>Nemotron 70B Instruct (NIM)</option>
+          <option value="mistralai/mixtral-8x22b-instruct-v0.1" ${defaultModel === 'mistralai/mixtral-8x22b-instruct-v0.1' ? 'selected' : ''}>Mixtral 8x22B Instruct (NIM)</option>
+          <option value="qwen/qwen2.5-72b-instruct" ${defaultModel === 'qwen/qwen2.5-72b-instruct' ? 'selected' : ''}>Qwen 2.5 72B Instruct (NIM)</option>
+          ${(allNvidiaModels || [])
+            .filter(m => ![
+              'deepseek-ai/deepseek-r1',
+              'deepseek-ai/deepseek-v3',
+              'meta/llama-3.3-70b-instruct',
+              'meta/llama-3.1-405b-instruct',
+              'meta/llama-3.1-70b-instruct',
+              'meta/llama-3.1-8b-instruct',
+              'nvidia/llama-3.1-nemotron-70b-instruct',
+              'mistralai/mixtral-8x22b-instruct-v0.1',
+              'qwen/qwen2.5-72b-instruct'
+            ].includes(m))
+            .map(m => `<option value="${m}" ${defaultModel === m ? 'selected' : ''}>${m} (Loaded NIM)</option>`)
+            .join('')}
+        </optgroup>
+        <optgroup label="⚪ Open Source">
+          <option value="gpt-oss-120b-medium" ${defaultModel === 'gpt-oss-120b-medium' ? 'selected' : ''}>GPT-OSS 120B (Medium)</option>
+        </optgroup>
+      `;
+
+      row.innerHTML = `
+        <span class="combo-step-number badge badge-blue" style="font-size:11px; font-weight:700; white-space:nowrap; min-width:105px; text-align:center;">Step #</span>
+        <select class="form-control combo-model-select" style="flex:3;">${modelOptGroups}</select>
+        <select class="form-control combo-account-select" style="flex:2;">${accountOptions}</select>
+        <div style="display:flex; gap:3px;">
+          <button class="btn btn-sm btn-outline" style="padding:4px 7px;" title="Move Up" onclick="moveStepRow(this, -1)">▲</button>
+          <button class="btn btn-sm btn-outline" style="padding:4px 7px;" title="Move Down" onclick="moveStepRow(this, 1)">▼</button>
+          <button class="btn btn-sm btn-outline" style="padding:4px 7px; color:#ef4444;" title="Delete Step" onclick="removeStepRow(this)">✕</button>
+        </div>
+        
+      `;
+      list.appendChild(row);
+      updateStepRowBadges();
+    }
+
+    function saveCurrentCombo() {
+      const nameInput = document.getElementById('comboNameInput');
+      const name = nameInput.value.trim();
+      const id = nameInput.getAttribute('data-combo-id') || undefined;
+      const description = document.getElementById('comboDescInput').value.trim();
+      if (!name) return alert('Please enter a combo name.');
+
+      const stepRows = document.querySelectorAll('#comboStepsList .combo-step-editor-row');
+      const steps = [];
+      stepRows.forEach(row => {
+        const model = row.querySelector('.combo-model-select').value;
+        const accountId = row.querySelector('.combo-account-select').value;
+        steps.push({ model, accountId });
+      });
+
+      if (steps.length === 0) return alert('Add at least one model step.');
+
+      api('/api/combos', {
+        method: 'POST',
+        body: JSON.stringify({ id, name, description, steps })
+      }).then(res => {
+        if (res.ok) {
+          showToast(`🎉 Combo "${name}" saved!`);
+          closeComboModal();
+          loadCombos();
+          loadModels();
+        } else {
+          alert('Error: ' + (res.error || 'Failed to save combo'));
+        }
+      });
+    }
+
+    function deleteComboItem(id) {
+      if (!confirm('Delete this combo?')) return;
+      api(`/api/combos/${id}`, { method: 'DELETE' }).then(() => {
+        showToast('Combo deleted');
+        loadCombos();
+        loadModels();
+      });
+    }
+
+    // ───── Live Quotas Tab ─────
+    function formatResetCountdown(isoString) {
+      if (!isoString) return { text: 'Continuous', countdown: 'Active', localTime: 'Continuous', shortCountdown: 'Continuous' };
+      const target = new Date(isoString).getTime();
+      const diff = target - Date.now();
+      if (isNaN(target)) return { text: isoString, countdown: isoString, localTime: isoString, shortCountdown: isoString };
+      if (diff <= 0) {
+        return { 
+          text: 'Resetting now', 
+          countdown: 'Resetting now', 
+          localTime: new Date(target).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          shortCountdown: 'Now'
+        };
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      const localTime = new Date(target).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      let cdStr = '';
+      if (hours > 0) cdStr = `${hours}h ${minutes}m ${seconds}s`;
+      else if (minutes > 0) cdStr = `${minutes}m ${seconds}s`;
+      else cdStr = `${seconds}s`;
+
+      return {
+        localTime,
+        countdown: cdStr,
+        shortCountdown: hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`,
+      };
+    }
+
+    // Ticker that updates every second
+    setInterval(() => {
+      document.querySelectorAll('.gemini-pool-countdown').forEach(el => {
+        const iso = el.getAttribute('data-reset');
+        if (iso) {
+          const cd = formatResetCountdown(iso);
+          el.textContent = cd.countdown;
+        }
+      });
+    }, 1000);
+
+    function renderModelCardHtml(m) {
+      const pct = m.percent !== null ? m.percent : 0;
+      let barClass = 'quota-bar-green';
+      let badgeClass = 'badge-green';
+      if (m.percent === null) {
+        barClass = 'quota-bar-gated';
+        badgeClass = 'badge-neutral';
+      } else if (pct === 0) {
+        barClass = 'quota-bar-red';
+        badgeClass = 'badge-red';
+      } else if (pct < 25) {
+        barClass = 'quota-bar-yellow';
+        badgeClass = 'badge-yellow';
+      }
+
+      const capBadges = [
+        m.supportsImages ? '<span class="badge badge-neutral" style="font-size:10px;">📸 Images</span>' : '',
+        m.supportsVideo ? '<span class="badge badge-neutral" style="font-size:10px;">🎥 Video</span>' : '',
+        m.supportsThinking ? '<span class="badge badge-neutral" style="font-size:10px;">🧠 Thinking</span>' : '',
+      ].filter(Boolean).join(' ');
+
+      const cd = formatResetCountdown(m.resetTime);
+      const resetText = m.resetTime ? `<span title="At ${cd.localTime} local time">${cd.shortCountdown}</span>` : 'Continuous';
+
+      return `
+        <div class="quota-model-item">
+          <div class="quota-model-top">
+            <div>
+              <div class="quota-model-name">${m.displayName || m.id}</div>
+              <div style="font-size:11px; color:var(--text-muted); font-family:'Fira Code',monospace;">${m.id}</div>
+            </div>
+        
+            <span class="badge ${badgeClass}">${m.percent !== null ? m.percent + '%' : 'GATED'}</span>
+          </div>
+        
+          <div class="quota-bar-bg">
+            <div class="quota-bar-fill ${barClass}" style="width: ${m.percent !== null ? m.percent : 100}%;"></div>
+          </div>
+        
+          <div class="quota-meta-row">
+            <span>Resets: <strong>${resetText}</strong></span>
+            <span>Max: ${(m.maxTokens / 1000).toFixed(0)}k</span>
+          </div>
+        
+          <div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap;">
+            ${capBadges}
+          </div>
+        
+        </div>
+        
+      `;
+    }
+
+    function toggleMoreModels(accId) {
+      const grid = document.getElementById('all-models-grid-' + accId);
+      const btnTop = document.getElementById('toggle-btn-top-' + accId);
+      const btnBottom = document.getElementById('toggle-btn-bottom-' + accId);
+      if (!grid) return;
+      const isHidden = grid.style.display === 'none';
+      grid.style.display = isHidden ? 'grid' : 'none';
+      const count = grid.getAttribute('data-count') || '';
+      const text = isHidden ? '🔼 Show Less (Collapse)' : `🔍 Show All Models (${count})`;
+      if (btnTop) btnTop.textContent = text;
+      if (btnBottom) btnBottom.textContent = text;
+    }
+
+    function loadQuotas() {
+      const container = document.getElementById('quotasContainer');
+      container.innerHTML = '<div style="color:var(--text-muted); font-style:italic;">Fetching live quotas from Google Antigravity...</div>';
+
+      api('/api/quotas').then(res => {
+        if (!res.ok || !Array.isArray(res.accounts) || res.accounts.length === 0) {
+          container.innerHTML = '<div style="color:var(--text-muted); font-style:italic;">No connected accounts found. Add an account in Accounts & Keys to view live quotas.</div>';
+          return;
+        }
+
+        container.innerHTML = '';
+        res.accounts.forEach(item => {
+          const acc = item.account;
+          const models = item.models || [];
+
+          const card = document.createElement('div');
+          card.className = 'quota-account-card';
+
+          const pic = acc.picture ? `<img class="account-pic" src="${acc.picture}" alt="">` : '';
+
+          if (models.length === 0) {
+            card.innerHTML = `
+              <div class="quota-account-header">
+                <div style="display:flex; align-items:center;">
+                  ${pic}
+                  <div>
+                    <strong style="font-size:15px; color:#fff;">${acc.name || acc.email}</strong>
+                    <div style="font-size:12px; color:var(--text-muted);">${acc.email} · Project: <code style="color:var(--primary);">${acc.projectId || 'aicode-consumers'}</code></div>
+                  </div>
+        
+                </div>
+        
+                <span class="badge badge-green">Connected</span>
+              </div>
+        
+              <div style="color:var(--text-muted); font-style:italic; padding:12px;">${item.error || 'No quota models reported for this project.'}</div>
+            `;
+            container.appendChild(card);
+            return;
+          }
+
+          // Split into Common Gemini pool vs others
+          const geminiPool = models.filter(m => m.id.startsWith('gemini-') && !m.id.includes('argon') && m.percent !== null);
+          const otherModels = models.filter(m => !geminiPool.includes(m));
+
+          const geminiPct = geminiPool[0]?.percent !== undefined ? geminiPool[0].percent : 78;
+          const poolResetIso = geminiPool[0]?.resetTime || '';
+          const poolCd = formatResetCountdown(poolResetIso);
+
+          const otherCardsHtml = otherModels.map(m => renderModelCardHtml(m)).join('');
+          const allIndividualCardsHtml = models.map(m => renderModelCardHtml(m)).join('');
+
+          card.innerHTML = `
+            <div class="quota-account-header">
+              <div style="display:flex; align-items:center;">
+                ${pic}
+                <div>
+                  <strong style="font-size:15px; color:#fff;">${acc.name || acc.email}</strong>
+                  <div style="font-size:12px; color:var(--text-muted);">${acc.email} · Project: <code style="color:var(--primary);">${acc.projectId || 'aicode-consumers'}</code></div>
+                </div>
+        
+              </div>
+        
+              <div style="display:flex; gap:10px; align-items:center;">
+                <span class="badge badge-green">Connected</span>
+                <button class="btn btn-sm btn-outline" id="toggle-btn-top-${acc.id}" onclick="toggleMoreModels('${acc.id}')">
+                  🔍 Show All Models (${models.length})
+                </button>
+              </div>
+        
+            </div>
+        
+
+            <!-- Unified Gemini Shared Quota Pool Hero -->
+            <div class="gemini-pool-hero">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:17px; font-weight:700; color:#fff;">✨ Common Gemini Quota Pool</span>
+                    <span class="badge badge-green" style="font-size:13px; font-weight:700; padding:4px 10px;">${geminiPct}% Available</span>
+                  </div>
+        
+                  <div style="color:var(--text-muted); font-size:13px; margin-top:4px;">
+                    Unified quota pool shared across all <strong>${geminiPool.length} Gemini models</strong> (Flash, Pro, Image & Tiered).
+                  </div>
+        
+                </div>
+        
+                <div style="text-align:right;">
+                  <div style="font-size:12px; color:var(--text-muted);">⏳ Pool Resets In:</div>
+                  <strong class="gemini-pool-countdown" data-reset="${poolResetIso}" style="color:#38bdf8; font-size:17px; font-weight:700; font-family:'Fira Code',monospace;">
+                    ${poolCd.countdown}
+                  </strong>
+                  <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+                    Daily reset at <strong>${poolCd.localTime}</strong> local time
+                  </div>
+        
+                </div>
+        
+              </div>
+        
+              <div class="quota-bar-bg" style="height:10px; margin:14px 0 10px;">
+                <div class="quota-bar-fill quota-bar-green" style="width: ${geminiPct}%;"></div>
+              </div>
+        
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; font-size:12px; color:var(--text-muted);">
+                <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                  <span style="color:var(--text-muted); font-size:11px;">Included in Pool:</span>
+                  <span class="badge badge-blue">⚡ Gemini 2.5 Flash</span>
+                  <span class="badge badge-blue">🚀 Gemini 3.8 Tiered</span>
+                  <span class="badge badge-blue">🧠 Gemini 2.5 Pro</span>
+                  <span class="badge badge-blue">🎨 Gemini 3.1 Image</span>
+                  <span class="badge badge-neutral">+${Math.max(0, geminiPool.length - 4)} more</span>
+                </div>
+        
+                <div>All Gemini models consume from this single <strong>${geminiPct}%</strong> pool.</div>
+              </div>
+        
+            </div>
+        
+
+            <!-- Other Gated / Distinct Models -->
+            <h4 style="color:#94a3b8; font-size:13px; text-transform:uppercase; letter-spacing:0.5px; margin:16px 0 10px;">
+              Other Model Families & Gated Models (${otherModels.length})
+            </h4>
+            <div class="quota-models-grid" style="margin-bottom:20px;">
+              ${otherCardsHtml}
+            </div>
+        
+
+            <!-- Show More Models / All Detailed Models Section -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:16px; border-top:1px solid #1e293b; margin-top:10px; margin-bottom:12px;">
+              <div>
+                <strong style="color:#fff; font-size:14px;">📋 All Individual Models (${models.length})</strong>
+                <div style="font-size:12px; color:var(--text-muted);">Inspect individual IDs, token context limits, and capabilities</div>
+              </div>
+        
+              <button class="btn btn-sm btn-primary" id="toggle-btn-bottom-${acc.id}" onclick="toggleMoreModels('${acc.id}')">
+                🔍 Show All Models (${models.length})
+              </button>
+            </div>
+        
+            <div id="all-models-grid-${acc.id}" data-count="${models.length}" class="quota-models-grid" style="display:none;">
+              ${allIndividualCardsHtml}
+            </div>
+        
+          `;
+          container.appendChild(card);
+        });
+      }).catch(err => {
+        container.innerHTML = `<div style="color:#ef4444;">Failed to fetch live quotas: ${err.message}</div>`;
+      });
+    }
+
+    // ───── Generate Media Studio ─────
+    async function runGenerateMedia() {
+      const prompt = document.getElementById('mediaPromptInput').value.trim();
+      const btn = document.getElementById('generateMediaBtn');
+      const box = document.getElementById('mediaPreviewBox');
+
+      if (!prompt) return alert('Please enter a description for the image.');
+
+      btn.disabled = true;
+      btn.textContent = '🎨 Generating Image...';
+      box.innerHTML = '<div style="color:var(--primary); font-size:14px;">⏳ Generating image with Gemini 3.1 Flash Image... saving to disk...</div>';
+
+      try {
+        const res = await api('/api/media/generate', {
+          method: 'POST',
+          body: JSON.stringify({ prompt, model: 'gemini-3.1-flash-image' })
+        });
+
+        if (res.data && res.data.length > 0) {
+          const imgUrl = res.data[0].url;
+          box.innerHTML = `
+            <img src="${imgUrl}" alt="Generated Image" class="media-preview-img">
+            <div style="margin-top:14px; display:flex; gap:10px;">
+              <a href="${imgUrl}" target="_blank" class="btn btn-primary btn-sm">📥 Open / Download Full Image</a>
+              <button class="btn btn-outline btn-sm" onclick="copyText('${imgUrl}', this)">📋 Copy URL</button>
+            </div>
+        
+            <div style="font-size:12px; color:var(--text-muted); margin-top:8px;">Served from: <code>${imgUrl}</code></div>
+          `;
+          showToast('🎉 Image generated successfully!');
+        } else {
+          const errMsg = res.error?.message || JSON.stringify(res);
+          box.innerHTML = `<div style="color:#ef4444;">No image returned: ${errMsg}</div>`;
+        }
+      } catch (err) {
+        box.innerHTML = `<div style="color:#ef4444;">Generation failed: ${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '✨ Generate Image';
+      }
+    }
+
+    // ───── Accounts ─────
+    function loadAccounts() {
+      api('/api/accounts').then(data => {
+        allAccounts = Array.isArray(data) ? data : [];
+        const tbody = document.getElementById('accountsBody');
+        if (!Array.isArray(data)) {
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="5" style="color:#ef4444;">Failed to load accounts. <button class="btn btn-sm btn-outline" onclick="loadAccounts()" style="margin-left:8px;">🔄 Retry</button></td></tr>';
+          return;
+        }
+        if (data.length === 0) {
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No accounts connected yet. Click "+ Add Account" to get started.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = '';
+        data.forEach(acc => {
+          const tr = document.createElement('tr');
+          const pic = acc.picture ? `<img class="account-pic" src="${acc.picture}" alt="">` : '';
+          tr.innerHTML = `
+            <td>${pic}<strong>${acc.name || acc.email}</strong><br><span style="color:var(--text-muted);font-size:12px;">${acc.email}</span></td>
+            <td><code style="font-size:12px; color:var(--primary);">${acc.projectId || '—'}</code></td>
+            <td><span class="status-dot ${acc.enabled ? 'on' : 'off'}"></span><span class="badge ${acc.enabled ? 'badge-green' : 'badge-red'}">${acc.enabled ? 'Enabled' : 'Disabled'}</span></td>
+            <td style="font-size:12px;color:var(--text-muted);">${acc.addedAt ? new Date(acc.addedAt).toLocaleDateString() : '—'}</td>
+            <td>
+              <button class="btn btn-sm ${acc.enabled ? 'btn-yellow' : 'btn-green'}" data-action="toggle" data-id="${acc.id}">${acc.enabled ? 'Disable' : 'Enable'}</button>
+              <button class="btn btn-sm btn-red" data-action="delete-account" data-id="${acc.id}">🗑️ Delete</button>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      }).catch(err => console.error('Failed to load accounts:', err));
+    }
+
+    document.getElementById('accountsBody').addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const action = btn.getAttribute('data-action');
+      const id = btn.getAttribute('data-id');
+      if (action === 'toggle') {
+        api(`/api/accounts/${id}/toggle`, { method: 'POST' }).then(loadAccounts);
+      } else if (action === 'delete-account') {
+        if (confirm('Disconnect this Google account?')) {
+          api(`/api/accounts/${id}`, { method: 'DELETE' }).then(() => {
+            showToast('Account removed');
+            loadAccounts();
+          });
+        }
+      }
+    });
+
+    // ───── NVIDIA NIM Keys ─────
+    function loadNvidiaKeys() {
+      api('/api/nvidia-keys').then(keys => {
+        allNvidiaKeys = Array.isArray(keys) ? keys : [];
+        renderNvidiaKeys(allNvidiaKeys);
+      }).catch(err => {
+        const tbody = document.getElementById('nvidiaKeysBody');
+        if (tbody) tbody.innerHTML = '<tr class="empty-row"><td colspan="5" style="color:#ef4444;">Failed to load NVIDIA NIM keys</td></tr>';
+      });
+    }
+
+    function renderNvidiaKeys(keys) {
+      const tbody = document.getElementById('nvidiaKeysBody');
+      if (!tbody) return;
+      if (!keys || keys.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No NVIDIA NIM keys added. Click "+ Add NVIDIA NIM Key" to add one from build.nvidia.com.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      keys.forEach(k => {
+        const tr = document.createElement('tr');
+        const statusBadge = k.enabled !== false
+          ? '<span class="status-dot on"></span><span class="badge badge-green">Active</span>'
+          : '<span class="status-dot off"></span><span class="badge badge-red">Disabled</span>';
+        const dateStr = k.addedAt ? new Date(k.addedAt).toLocaleDateString() : '—';
+        tr.innerHTML = `
+          <td><strong>${k.name}</strong></td>
+          <td><code style="font-family:monospace; color:#22c55e;">${k.key}</code></td>
+          <td>${statusBadge}</td>
+          <td style="color:var(--text-muted); font-size:12px;">${dateStr}</td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-sm btn-outline" onclick="testNvidiaKey('${k.id}')">⚡ Test & Load Models</button>
+              <button class="btn btn-sm ${k.enabled !== false ? 'btn-yellow' : 'btn-green'}" onclick="toggleNvidiaKey('${k.id}')">${k.enabled !== false ? 'Disable' : 'Enable'}</button>
+              <button class="btn btn-sm btn-red" onclick="deleteNvidiaKey('${k.id}')">🗑️ Delete</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function toggleNvidiaKeyVisibility() {
+      const el = document.getElementById('nvidiaKeyValueInput');
+      if (el) el.type = el.type === 'password' ? 'text' : 'password';
+    }
+
+    function onNvidiaKeyInput() {
+      const resEl = document.getElementById('nvidiaKeyTestResult');
+      if (resEl) resEl.style.display = 'none';
+    }
+
+    function openNvidiaKeyModal() {
+      document.getElementById('nvidiaKeyNameInput').value = '';
+      document.getElementById('nvidiaKeyValueInput').value = '';
+      const resEl = document.getElementById('nvidiaKeyTestResult');
+      if (resEl) {
+        resEl.style.display = 'none';
+        resEl.innerHTML = '';
+      }
+      document.getElementById('nvidiaKeyModal').classList.add('show');
+    }
+
+    function closeNvidiaKeyModal() {
+      document.getElementById('nvidiaKeyModal').classList.remove('show');
+    }
+
+    function testCurrentNvidiaKeyInput() {
+      const keyEl = document.getElementById('nvidiaKeyValueInput');
+      const nameEl = document.getElementById('nvidiaKeyNameInput');
+      const resEl = document.getElementById('nvidiaKeyTestResult');
+      const btn = document.getElementById('btnTestNvidiaKey');
+      const key = keyEl ? keyEl.value.trim() : '';
+
+      if (!key) {
+        showToast('⚠️ Please enter an NVIDIA NIM API key');
+        if (resEl) {
+          resEl.style.display = 'block';
+          resEl.style.background = '#450a0a';
+          resEl.style.border = '1px solid #dc2626';
+          resEl.style.color = '#fecaca';
+          resEl.innerHTML = '⚠️ Please enter an NVIDIA NIM API key (starts with <code>nvapi-</code>)';
+        }
+        return;
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Testing & Loading...';
+      }
+      if (resEl) {
+        resEl.style.display = 'block';
+        resEl.style.background = '#0f172a';
+        resEl.style.border = '1px solid #334155';
+        resEl.style.color = '#94a3b8';
+        resEl.innerHTML = '⏳ Querying NVIDIA NIM API (<code>https://integrate.api.nvidia.com/v1/models</code>)...';
+      }
+
+      api('/api/nvidia-keys/test', {
+        method: 'POST',
+        body: JSON.stringify({ key })
+      }).then(res => {
+        if (res.ok) {
+          if (nameEl && !nameEl.value.trim()) {
+            nameEl.value = `NVIDIA NIM (${res.modelCount} Models)`;
+          }
+          if (resEl) {
+            resEl.style.background = '#052e16';
+            resEl.style.border = '1px solid #16a34a';
+            resEl.style.color = '#bbf7d0';
+            const chips = (res.highlightedModels || []).map(m => `<span style="display:inline-block; background:#14532d; color:#86efac; padding:2px 8px; border-radius:12px; font-size:11px; margin:2px;">${m}</span>`).join('');
+            resEl.innerHTML = `
+              <div style="font-weight:600; margin-bottom:4px; color:#4ade80;">✅ Key Verified! Loaded ${res.modelCount} Models (${res.latencyMs}ms)</div>
+              <div style="font-size:11px; color:#86efac; margin-bottom:6px;">Models cached & ready for Combos and completions.</div>
+              <div style="display:flex; flex-wrap:wrap; gap:4px; max-height:80px; overflow-y:auto;">${chips}</div>
+            `;
+          }
+          showToast(`✅ NVIDIA Key verified! Loaded ${res.modelCount} models`);
+          loadNvidiaModels();
+        } else {
+          if (resEl) {
+            resEl.style.background = '#450a0a';
+            resEl.style.border = '1px solid #dc2626';
+            resEl.style.color = '#fecaca';
+            resEl.innerHTML = `❌ <strong>Verification Failed:</strong> ${res.error || 'NVIDIA NIM returned an error'}`;
+          }
+          showToast('❌ ' + (res.error || 'Verification failed'));
+        }
+      }).catch(err => {
+        if (resEl) {
+          resEl.style.background = '#450a0a';
+          resEl.style.border = '1px solid #dc2626';
+          resEl.style.color = '#fecaca';
+          resEl.innerHTML = `❌ <strong>Connection Error:</strong> ${err.message}`;
+        }
+      }).finally(() => {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '🧪 Test & Load Models';
+        }
+      });
+    }
+
+    function saveNvidiaKey() {
+      const name = document.getElementById('nvidiaKeyNameInput').value.trim();
+      const key = document.getElementById('nvidiaKeyValueInput').value.trim();
+      if (!key) return alert('Please enter an NVIDIA NIM API key');
+      api('/api/nvidia-keys', {
+        method: 'POST',
+        body: JSON.stringify({ name, key })
+      }).then(res => {
+        if (res.ok) {
+          showToast('✅ NVIDIA NIM key saved!');
+          closeNvidiaKeyModal();
+          loadNvidiaKeys();
+          loadNvidiaModels();
+        } else {
+          alert(res.error || 'Failed to save key');
+        }
+      }).catch(err => alert(err.message));
+    }
+
+    function deleteNvidiaKey(id) {
+      if (!confirm('Delete this NVIDIA NIM key?')) return;
+      api('/api/nvidia-keys/' + id, { method: 'DELETE' }).then(() => {
+        showToast('NVIDIA NIM key removed');
+        loadNvidiaKeys();
+      });
+    }
+
+    function toggleNvidiaKey(id) {
+      api('/api/nvidia-keys/' + id + '/toggle', { method: 'POST' }).then(() => {
+        showToast('NVIDIA NIM key updated');
+        loadNvidiaKeys();
+      });
+    }
+
+    function testNvidiaKey(id) {
+      showToast('⏳ Testing NVIDIA NIM key & fetching models...');
+      api('/api/nvidia-keys/test', {
+        method: 'POST',
+        body: JSON.stringify({ id })
+      }).then(res => {
+        if (res.ok) {
+          showToast(`✅ NVIDIA Key Verified! ${res.modelCount} models loaded (${res.latencyMs}ms)`);
+          loadNvidiaModels();
+          alert(`✅ NVIDIA NIM Key Verified!\n\nStatus: Active & Valid\nModels Available: ${res.modelCount}\nLatency: ${res.latencyMs}ms\n\nTop Models Loaded:\n• ${(res.highlightedModels || []).slice(0, 8).join('\n• ')}\n\nThese models are now cached and immediately available in Combos and API requests!`);
+        } else {
+          alert(`❌ NVIDIA NIM Test Failed:\n\n${res.error || 'Unknown error'}`);
+        }
+      }).catch(err => alert('Test failed: ' + err.message));
+    }
+
+    function loadNvidiaModels() {
+      return api('/api/nvidia-keys/models').then(data => {
+        if (data && data.ok && Array.isArray(data.models)) {
+          allNvidiaModels = data.models;
+        }
+      }).catch(() => {});
+    }
+
+    // ───── API Keys ─────
+    function loadKeys() {
+      api('/api/keys').then(data => {
+        const tbody = document.getElementById('keysBody');
+        if (!Array.isArray(data)) {
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="5" style="color:#ef4444;">Failed to load API keys. <button class="btn btn-sm btn-outline" onclick="loadKeys()" style="margin-left:8px;">🔄 Retry</button></td></tr>';
+          return;
+        }
+        if (data.length === 0) {
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No API keys yet. Click "+ Create API Key" to make one.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = '';
+        data.forEach(k => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><strong>${k.name || 'Untitled'}</strong></td>
+            <td><code style="background:#0b1120; padding:4px 8px; border-radius:4px; color:#22d3ee; font-family:monospace;">${k.key}</code></td>
+            <td style="font-size:12px;color:var(--text-muted);">${new Date(k.createdAt).toLocaleString()}</td>
+            <td style="font-size:12px;color:var(--text-muted);">${k.lastUsed ? new Date(k.lastUsed).toLocaleString() : 'Never'}</td>
+            <td>
+              <button class="btn btn-sm btn-yellow" data-action="rotate" data-id="${k.id}">🔄 Rotate</button>
+              <button class="btn btn-sm btn-red" data-action="delete-key" data-id="${k.id}">🗑️ Delete</button>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      }).catch(err => console.error('Failed to load keys:', err));
+    }
+
+    document.getElementById('keysBody').addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const action = btn.getAttribute('data-action');
+      const id = btn.getAttribute('data-id');
+      if (action === 'rotate') {
+        api(`/api/keys/${id}/rotate`, { method: 'POST' }).then(data => {
+          if (data.key) {
+            document.getElementById('newKeyValue').textContent = data.key;
+            document.getElementById('newKeyModal').classList.add('show');
+          }
+          loadKeys();
+        });
+      } else if (action === 'delete-key') {
+        if (confirm('Delete this API key? Applications using it will lose access.')) {
+          api(`/api/keys/${id}`, { method: 'DELETE' }).then(() => {
+            showToast('API key deleted');
+            loadKeys();
+          });
+        }
+      }
+    });
+
+    function promptCreateKey() {
+      const name = prompt('Name for the new API key (e.g. Cursor, Claude, Cline):') || '';
+      api('/api/keys', { method: 'POST', body: JSON.stringify({ name }) }).then(data => {
+        if (data.key) {
+          document.getElementById('newKeyValue').textContent = data.key;
+          document.getElementById('newKeyModal').classList.add('show');
+        }
+        loadKeys();
+      });
+    }
+
+    function closeKeyModal() {
+      document.getElementById('newKeyModal').classList.remove('show');
+    }
+
+    // ───── Analytics Tab ─────
+    function loadAnalytics() {
+      api('/api/analytics').then(data => {
+        if (!data) return;
+
+        const total = data.totalRequests || 0;
+        const succ = data.successfulRequests || 0;
+        const failed = data.failedRequests || 0;
+        const pTok = data.totalPromptTokens || 0;
+        const cTok = data.totalCompletionTokens || 0;
+        const totTok = data.totalTokens || (pTok + cTok);
+
+        document.getElementById('statTotalReqs').textContent = total.toLocaleString();
+        document.getElementById('statSuccessReqs').textContent = succ.toLocaleString();
+        document.getElementById('statFailedReqs').textContent = failed.toLocaleString();
+        document.getElementById('statTotalTokens').textContent = totTok.toLocaleString();
+        document.getElementById('statPromptTokens').textContent = pTok.toLocaleString();
+        document.getElementById('statCompTokens').textContent = cTok.toLocaleString();
+
+        const rate = total > 0 ? Math.round((succ / total) * 100) : 100;
+        document.getElementById('statSuccessRate').textContent = rate + '%';
+
+        const recents = data.recentRequests || [];
+        if (recents.length > 0) {
+          const avg = Math.round(recents.reduce((acc, r) => acc + (r.latencyMs || 0), 0) / recents.length);
+          document.getElementById('statAvgLatency').textContent = avg + 'ms';
+        } else {
+          document.getElementById('statAvgLatency').textContent = '—';
+        }
+
+        const modelBody = document.getElementById('modelUsageBody');
+        const models = Object.entries(data.modelUsage || {});
+        if (models.length === 0) {
+          modelBody.innerHTML = '<tr class="empty-row"><td colspan="5">No usage recorded yet.</td></tr>';
+        } else {
+          modelBody.innerHTML = '';
+          models.sort((a, b) => b[1].totalTokens - a[1].totalTokens);
+          models.forEach(([mName, mStats]) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td><strong style="color:var(--primary); font-family:monospace;">${mName}</strong></td>
+              <td>${(mStats.requests || 0).toLocaleString()}</td>
+              <td>${(mStats.promptTokens || 0).toLocaleString()}</td>
+              <td>${(mStats.completionTokens || 0).toLocaleString()}</td>
+              <td><strong style="color:#fff;">${(mStats.totalTokens || 0).toLocaleString()}</strong></td>
+            `;
+            modelBody.appendChild(tr);
+          });
+        }
+
+        const recentBody = document.getElementById('recentRequestsBody');
+        if (recents.length === 0) {
+          recentBody.innerHTML = '<tr class="empty-row"><td colspan="6">No recent requests logged.</td></tr>';
+        } else {
+          recentBody.innerHTML = '';
+          recents.forEach(r => {
+            const tr = document.createElement('tr');
+            const isOk = r.status >= 200 && r.status < 300;
+            const statusBadge = isOk
+              ? `<span class="badge badge-green">${r.status} OK</span>`
+              : `<span class="badge badge-red">${r.status || 'ERR'}</span>`;
+            tr.innerHTML = `
+              <td style="color:var(--text-muted); font-size:12px;">${new Date(r.timestamp).toLocaleTimeString()}</td>
+              <td><code style="color:var(--primary); font-family:monospace;">${r.model}</code></td>
+              <td style="color:var(--text-muted); font-size:12px;">${r.accountEmail}</td>
+              <td>${(r.totalTokens || 0).toLocaleString()}</td>
+              <td>${r.latencyMs || 0}ms</td>
+              <td>${statusBadge}</td>
+            `;
+            recentBody.appendChild(tr);
+          });
+        }
+      }).catch(err => console.error('Failed to load analytics:', err));
+    }
+
+    function clearAnalyticsData() {
+      if (!confirm('Reset all analytics and request logs?')) return;
+      api('/api/analytics/clear', { method: 'POST' }).then(() => {
+        showToast('Analytics reset');
+        loadAnalytics();
+      });
+    }
+
+    // ───── Gemini Cookie Management ─────
+    function loadGeminiCookies() {
+      api('/api/cookies').then(cookies => {
+        allGeminiCookies = Array.isArray(cookies) ? cookies : [];
+        renderGeminiCookies(allGeminiCookies);
+      }).catch(err => {
+        const tbody = document.getElementById('geminiCookiesBody');
+        if (tbody) tbody.innerHTML = '<tr class="empty-row"><td colspan="5" style="color:#ef4444;">Failed to load cookies</td></tr>';
+      });
+    }
+
+    function renderGeminiCookies(cookies) {
+      const tbody = document.getElementById('geminiCookiesBody');
+      if (!tbody) return;
+      if (!cookies || cookies.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No Gemini Web cookies added yet. Click "+ Add Gemini Web Cookie" to add one!</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      cookies.forEach(c => {
+        const tr = document.createElement('tr');
+        const statusBadge = c.enabled !== false
+          ? '<span class="status-dot on"></span><span class="badge badge-green">Active</span>'
+          : '<span class="status-dot off"></span><span class="badge badge-red">Disabled</span>';
+        const dateStr = c.addedAt ? new Date(c.addedAt).toLocaleDateString() : '—';
+        tr.innerHTML = `
+          <td><strong>${c.name}</strong></td>
+          <td><code style="font-family:monospace; color:#22d3ee;">${c.cookie}</code></td>
+          <td>${statusBadge}</td>
+          <td style="color:var(--text-muted); font-size:12px;">${dateStr}</td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-sm btn-outline" onclick="testStoredCookie('${c.id}')">🧪 Test</button>
+              <button class="btn btn-sm ${c.enabled !== false ? 'btn-yellow' : 'btn-green'}" onclick="toggleStoredCookie('${c.id}')">${c.enabled !== false ? 'Disable' : 'Enable'}</button>
+              <button class="btn btn-sm btn-red" onclick="deleteStoredCookie('${c.id}')">🗑️ Delete</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    let currentCookieInputMode = 'two-boxes';
+
+    function setCookieInputMode(mode) {
+      currentCookieInputMode = mode;
+      const tab2 = document.getElementById('cookieModeTab2Boxes');
+      const tabRaw = document.getElementById('cookieModeTabRaw');
+      const box2 = document.getElementById('cookieModeTwoBoxes');
+      const boxRaw = document.getElementById('cookieModeRaw');
+      if (tab2 && tabRaw && box2 && boxRaw) {
+        if (mode === 'two-boxes') {
+          tab2.className = 'btn btn-sm btn-primary';
+          tabRaw.className = 'btn btn-sm btn-outline';
+          box2.style.display = 'block';
+          boxRaw.style.display = 'none';
+        } else {
+          tab2.className = 'btn btn-sm btn-outline';
+          tabRaw.className = 'btn btn-sm btn-primary';
+          box2.style.display = 'none';
+          boxRaw.style.display = 'block';
+        }
+      }
+    }
+
+    function cleanCookieVal(val, keyName) {
+      if (!val) return '';
+      let s = val.trim();
+      if (s.toLowerCase().startsWith(keyName.toLowerCase() + '=')) {
+        s = s.slice(keyName.length + 1).trim();
+      }
+      s = s.replace(/;+$/, '').replace(/^["']|["']$/g, '').trim();
+      return s;
+    }
+
+    function onCookiePsidInput() {
+      const el = document.getElementById('cookiePsidInput');
+      if (!el) return;
+      const raw = el.value;
+      if (!raw) return;
+      // Auto-detect if user pasted a multi-cookie string or raw header into the PSID box
+      if (raw.includes('__Secure-1PSIDTS=') || raw.includes('sidts-')) {
+        const psidMatch = raw.match(/__Secure-1PSID=([^;]+)/i);
+        const psidtsMatch = raw.match(/__Secure-1PSIDTS=([^;]+)/i);
+        const psidccMatch = raw.match(/__Secure-1PSIDCC=([^;]+)/i);
+        if (psidMatch) el.value = psidMatch[1].trim();
+        if (psidtsMatch) {
+          const tsEl = document.getElementById('cookiePsidtsInput');
+          if (tsEl) tsEl.value = psidtsMatch[1].trim();
+        }
+        if (psidccMatch) {
+          const ccEl = document.getElementById('cookiePsidccInput');
+          if (ccEl) ccEl.value = psidccMatch[1].trim();
+        }
+        showToast('🪄 Detected both cookies and filled both boxes!');
+      }
+    }
+
+    function getCombinedCookieValue() {
+      if (currentCookieInputMode === 'two-boxes') {
+        const psidEl = document.getElementById('cookiePsidInput');
+        const psidtsEl = document.getElementById('cookiePsidtsInput');
+        const psidccEl = document.getElementById('cookiePsidccInput');
+
+        let psid = psidEl ? cleanCookieVal(psidEl.value, '__Secure-1PSID') : '';
+        let psidts = psidtsEl ? cleanCookieVal(psidtsEl.value, '__Secure-1PSIDTS') : '';
+        let psidcc = psidccEl ? cleanCookieVal(psidccEl.value, '__Secure-1PSIDCC') : '';
+
+        // If user pasted a full cookie string into the PSID box without separation
+        if (psid.includes('__Secure-1PSIDTS=') || psid.includes(';')) {
+          return psid;
+        }
+
+        const parts = [];
+        if (psid) parts.push(`__Secure-1PSID=${psid}`);
+        if (psidts) parts.push(`__Secure-1PSIDTS=${psidts}`);
+        if (psidcc) parts.push(`__Secure-1PSIDCC=${psidcc}`);
+        return parts.join('; ');
+      }
+      const rawEl = document.getElementById('cookieInput');
+      return rawEl ? rawEl.value.trim() : '';
+    }
+
+    function openCookieModal() {
+      const modal = document.getElementById('cookieModal');
+      const existing = getCookie('ag_token') || localStorage.getItem('ag_token') || '';
+      document.getElementById('cookieInput').value = existing;
+      document.getElementById('cookieNameInput').value = '';
+
+      if (existing) {
+        const psidMatch = existing.match(/__Secure-1PSID=([^;]+)/i);
+        const psidtsMatch = existing.match(/__Secure-1PSIDTS=([^;]+)/i);
+        const psidccMatch = existing.match(/__Secure-1PSIDCC=([^;]+)/i);
+        document.getElementById('cookiePsidInput').value = psidMatch ? psidMatch[1].trim() : (existing.startsWith('__') ? '' : existing);
+        document.getElementById('cookiePsidtsInput').value = psidtsMatch ? psidtsMatch[1].trim() : '';
+        document.getElementById('cookiePsidccInput').value = psidccMatch ? psidccMatch[1].trim() : '';
+      } else {
+        document.getElementById('cookiePsidInput').value = '';
+        document.getElementById('cookiePsidtsInput').value = '';
+        document.getElementById('cookiePsidccInput').value = '';
+      }
+
+      setCookieInputMode('two-boxes');
+      const testRes = document.getElementById('cookieTestResult');
+      if (testRes) { testRes.style.display = 'none'; testRes.innerHTML = ''; }
+      const statusEl = document.getElementById('cookieCurrentStatus');
+      if (existing) {
+        statusEl.innerHTML = '<span class="badge badge-green">✅ Browser Cookie Active</span> <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">' + existing.slice(0, 24) + '...</span>';
+      } else {
+        statusEl.innerHTML = '<span class="badge badge-red">❌ No browser cookie active</span>';
+      }
+      modal.classList.add('show');
+    }
+
+    function closeCookieModal() {
+      document.getElementById('cookieModal').classList.remove('show');
+    }
+
+    function testCurrentCookieInput() {
+      const val = getCombinedCookieValue();
+      const resEl = document.getElementById('cookieTestResult');
+      const btn = document.getElementById('btnTestCookie');
+      if (!val) {
+        showToast('⚠️ Please enter cookie values in both boxes');
+        return;
+      }
+      btn.textContent = '⏳ Testing...';
+      btn.disabled = true;
+      resEl.style.display = 'block';
+      resEl.style.background = '#1e293b';
+      resEl.innerHTML = '<span style="color:var(--text-muted);">🔄 Verifying cookie with Gemini session...</span>';
+
+      api('/api/cookie/test', {
+        method: 'POST',
+        body: JSON.stringify({ cookie: val })
+      }).then(res => {
+        btn.textContent = '🧪 Test Cookie';
+        btn.disabled = false;
+        if (res.ok) {
+          resEl.style.background = 'rgba(34, 197, 94, 0.15)';
+          resEl.style.border = '1px solid rgba(34, 197, 94, 0.4)';
+          resEl.innerHTML = `<span style="color:#22c55e; font-weight:600;">✅ ${res.message || 'Cookie is active and valid!'}</span>`;
+          showToast('✅ Cookie verified successfully!');
+        } else {
+          resEl.style.background = 'rgba(239, 68, 68, 0.15)';
+          resEl.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+          resEl.innerHTML = `<span style="color:#ef4444; font-weight:600;">❌ ${res.error || 'Cookie test failed'}</span>`;
+          showToast('❌ Cookie verification failed');
+        }
+      }).catch(err => {
+        btn.textContent = '🧪 Test Cookie';
+        btn.disabled = false;
+        resEl.style.display = 'block';
+        resEl.style.background = 'rgba(239, 68, 68, 0.15)';
+        resEl.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+        resEl.innerHTML = `<span style="color:#ef4444;">❌ Error: ${err.message}</span>`;
+      });
+    }
+
+    function testStoredCookie(id) {
+      showToast('⏳ Testing cookie...');
+      api('/api/cookie/test', {
+        method: 'POST',
+        body: JSON.stringify({ id })
+      }).then(res => {
+        if (res.ok) {
+          showToast('✅ ' + (res.message || 'Cookie verified!'));
+        } else {
+          showToast('❌ ' + (res.error || 'Cookie verification failed'));
+        }
+        loadGeminiCookies();
+      }).catch(err => showToast('❌ ' + err.message));
+    }
+
+    function toggleStoredCookie(id) {
+      api('/api/cookies/' + id + '/toggle', { method: 'POST' }).then(() => {
+        loadGeminiCookies();
+      });
+    }
+
+    function deleteStoredCookie(id) {
+      if (!confirm('Delete this Gemini Web cookie?')) return;
+      api('/api/cookies/' + id, { method: 'DELETE' }).then(() => {
+        showToast('🗑️ Cookie removed');
+        loadGeminiCookies();
+      });
+    }
+
+    function saveGeminiCookie() {
+      const val = getCombinedCookieValue();
+      const name = document.getElementById('cookieNameInput').value.trim();
+      if (!val) {
+        showToast('⚠️ Please enter cookie values');
+        return;
+      }
+      // Set as browser cookie so cookieAuth middleware picks it up
+      document.cookie = 'ag_token=' + encodeURIComponent(val) + '; path=/; max-age=31536000; SameSite=Lax';
+      localStorage.setItem('ag_token', val);
+
+      // Also persist on server so proxy clients & combos can use it
+      api('/api/cookies', {
+        method: 'POST',
+        body: JSON.stringify({ cookie: val, name: name || 'Gemini Web Account' })
+      }).then(res => {
+        if (res.ok) {
+          showToast('✅ Gemini cookie saved successfully!');
+          closeCookieModal();
+          updateCookieStatus();
+          loadGeminiCookies();
+        } else {
+          showToast('⚠️ ' + (res.error || 'Failed to save cookie on server'));
+        }
+      }).catch(err => {
+        closeCookieModal();
+        updateCookieStatus();
+      });
+    }
+
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? decodeURIComponent(match[2]) : null;
+    }
+
+    function removeGeminiCookie() {
+      document.cookie = 'ag_token=; path=/; max-age=0';
+      localStorage.removeItem('ag_token');
+      showToast('🗑️ Gemini browser cookie removed');
+      updateCookieStatus();
+    }
+
+    function updateCookieStatus() {
+      const btn = document.getElementById('cookieStatusBtn');
+      if (!btn) return;
+      const token = getCookie('ag_token') || localStorage.getItem('ag_token');
+      if (token) {
+        btn.textContent = '🪙 Cookie Active';
+        btn.className = 'btn btn-green btn-sm';
+      } else {
+        btn.textContent = '🪙 Add Gemini Cookie';
+        btn.className = 'btn btn-outline btn-sm';
+      }
+    }
+
+    // Restore cookie from localStorage on page load
+    (function restoreCookieFromStorage() {
+      const stored = localStorage.getItem('ag_token');
+      if (stored && !getCookie('ag_token')) {
+        document.cookie = 'ag_token=' + encodeURIComponent(stored) + '; path=/; max-age=31536000; SameSite=Lax';
+      }
+    })();
+
+    // ───── Init ─────
+    loadModels();
+    loadAccounts();
+    loadCombos();
+    loadKeys();
+    loadNvidiaKeys();
+    loadNvidiaModels();
+    loadGeminiCookies();
+    updateCookieStatus();
+  </script>
+</body>
+</html>

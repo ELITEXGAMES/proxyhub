@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acceptable Use Policy — Antigravity Proxy</title>
+  <meta name="description" content="Acceptable Use Policy (AUP) establishing prohibited activities, security standards, and enforcement rules for Antigravity Proxy.">
+  <meta name="robots" content="noindex, follow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #030712;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(30, 41, 59, 0.85);
+      --text: #f9fafb;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --accent: #818cf8;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.75;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 28px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .brand span { color: var(--primary); }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+    }
+    .nav-links a:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+    .nav-links a.active {
+      color: var(--danger);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+    .btn-back {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--primary) !important;
+      padding: 6px 14px !important;
+      border-radius: 6px;
+      font-size: 13px !important;
+      text-decoration: none;
+      font-weight: 600 !important;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-back:hover {
+      background: var(--primary) !important;
+      color: #030712 !important;
+    }
+    .container {
+      max-width: 900px;
+      margin: 36px auto 60px;
+      padding: 0 24px;
+      flex: 1;
+    }
+    .doc-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 42px 46px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+    }
+    .doc-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ef4444 0%, #f59e0b 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+    }
+    .meta-bar span { display: inline-flex; align-items: center; gap: 6px; }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-left: 3px solid var(--danger);
+      padding-left: 12px;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+    p, ul, ol {
+      color: #cbd5e1;
+      font-size: 14.5px;
+      margin-bottom: 16px;
+    }
+    ul, ol { margin-left: 24px; }
+    li { margin-bottom: 8px; }
+    strong { color: #f8fafc; }
+    .alert-box {
+      background: rgba(239, 68, 68, 0.08);
+      border-left: 4px solid var(--danger);
+      padding: 16px 20px;
+      border-radius: 0 10px 10px 0;
+      margin: 22px 0;
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+    .alert-box.warning {
+      background: rgba(245, 158, 11, 0.08);
+      border-left-color: var(--warning);
+    }
+    .placeholder {
+      display: inline-block;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px dashed var(--warning);
+      color: #fde68a;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+      font-size: 12.5px;
+    }
+    code {
+      font-family: 'Fira Code', monospace;
+      font-size: 12.5px;
+      background: rgba(30, 41, 59, 0.8);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--primary);
+    }
+    .prohibition-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin: 20px 0;
+    }
+    .prohibition-item {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-left: 3px solid var(--danger);
+      border-radius: 8px;
+      padding: 14px 18px;
+    }
+    .prohibition-item h4 {
+      font-size: 15px;
+      color: #fca5a5;
+      margin-bottom: 6px;
+    }
+    .prohibition-item p {
+      margin-bottom: 0;
+      font-size: 13.5px;
+    }
+    .table-of-contents {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 30px;
+    }
+    .table-of-contents summary {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--primary);
+      cursor: pointer;
+      user-select: none;
+    }
+    .table-of-contents ol {
+      margin: 12px 0 0 20px;
+      font-size: 13px;
+    }
+    .table-of-contents a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .table-of-contents a:hover {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+    footer {
+      border-top: 1px solid var(--card-border);
+      padding: 28px 24px;
+      text-align: center;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      background: rgba(15, 23, 42, 0.7);
+      margin-top: auto;
+    }
+    footer a { color: var(--text-muted); text-decoration: none; margin: 0 8px; transition: color 0.15s; }
+    footer a:hover { color: var(--primary); }
+    @media (max-width: 768px) {
+      .doc-card { padding: 24px 20px; }
+      h1 { font-size: 26px; }
+      .header { flex-direction: column; gap: 14px; align-items: flex-start; padding: 14px 18px; }
+      .nav-links { width: 100%; flex-wrap: wrap; gap: 8px; }
+      .nav-links a { font-size: 12.5px; padding: 4px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <a href="/" class="brand">⚡ Antigravity <span>Proxy</span></a>
+    <nav class="nav-links" aria-label="Legal Navigation">
+      <a href="/" class="btn-back">← Dashboard</a>
+      <a href="/terms">Terms of Service</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/acceptable-use" class="active">Acceptable Use</a>
+      <a href="/disclaimer">Disclaimer</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <article class="doc-card">
+      <div class="doc-badge">Operational Conduct Standards</div>
+      <h1>Acceptable Use Policy</h1>
+      
+      <div class="meta-bar">
+        <span>📅 <strong>Last Updated:</strong> November 10, 2026</span>
+        <span>⚖️ <strong>Legal Foundation:</strong> IT Act 2000, IPC / BNS 2023, Intermediary Rules (India)</span>
+        <span>🛡️ <strong>Zero Tolerance:</strong> CSAM/CSAE, Terrorism, Malware, Cyber Abuse</span>
+        <span>📍 <strong>Operator:</strong> <span class="placeholder">[Operator Name / Legal Entity]</span></span>
+      </div>
+
+      <div class="alert-box">
+        <strong>STRICT COMPLIANCE MANDATORY:</strong> This Acceptable Use Policy ("AUP") defines the mandatory rules, operational restrictions, and ethical obligations governing any use of Antigravity Proxy. Violation of any provision of this AUP may result in immediate revocation of API keys, blocking of network IP addresses, and, where mandated by law, reporting to law enforcement authorities including the Indian Computer Emergency Response Team (CERT-In) and the National Cyber Crime Reporting Portal.
+      </div>
+
+      <details class="table-of-contents" open>
+        <summary>📑 Table of Contents</summary>
+        <ol>
+          <li><a href="#aup-1">1. Scope & Applicability</a></li>
+          <li><a href="#aup-2">2. Zero Tolerance Violations</a></li>
+          <li><a href="#aup-3">3. Category-Specific Prohibitions</a></li>
+          <li><a href="#aup-4">4. Cyber Security & Unauthorized Access</a></li>
+          <li><a href="#aup-5">5. Bypassing Third-Party Safety Guardrails & Provider Policies</a></li>
+          <li><a href="#aup-6">6. Infrastructure, Resource Abuse & Rate Limit Evasion</a></li>
+          <li><a href="#aup-7">7. Investigation, Enforcement & Penalties</a></li>
+          <li><a href="#aup-8">8. Mandatory Statutory Reporting & Law Enforcement Cooperation</a></li>
+          <li><a href="#aup-9">9. Reporting Abuse & Incident Contact</a></li>
+        </ol>
+      </details>
+
+      <section id="aup-1">
+        <h2>1. Scope & Applicability</h2>
+        <p>
+          This Policy applies comprehensively to all individuals, developers, automated programs, API clients, testing scripts, and autonomous AI agents (including OpenClaw, Claude Code, Continue, Cursor) that interact with or send network requests to this Antigravity Proxy deployment.
+        </p>
+        <p>
+          By generating API credentials, connecting Google accounts or cookies, or transmitting payloads through <code>/v1/chat/completions</code>, <code>/v1/messages</code>, or media endpoints, you warrant that your actions strictly conform to this Policy.
+        </p>
+      </section>
+
+      <section id="aup-2">
+        <h2>2. Zero Tolerance Violations</h2>
+        <p>
+          The Operator maintains an absolute <strong>ZERO-TOLERANCE</strong> policy regarding the following offenses. Any detected occurrence will result in immediate termination, permanent blacklisting, and reporting to legal authorities without prior notice:
+        </p>
+        <div class="prohibition-grid">
+          <div class="prohibition-item">
+            <h4>🚫 Child Sexual Abuse Material (CSAM) & Child Sexual Exploitation and Abuse (CSAE)</h4>
+            <p>Generating, soliciting, enhancing, altering, or transmitting any representation of sexual abuse, exploitation, or grooming involving minors. Fully prohibited under Section 67B of the Information Technology Act, 2000 and the Protection of Children from Sexual Offences (POCSO) Act, 2012.</p>
+          </div>
+          <div class="prohibition-item">
+            <h4>🚫 Terrorism, Violent Extremism & Insurgency</h4>
+            <p>Advocating, planning, facilitating, or promoting acts of terrorism, violence against religious, ethnic, or national groups, or threats to national security and public order under the Unlawful Activities (Prevention) Act (UAPA) and the Bharatiya Nyaya Sanhita, 2023.</p>
+          </div>
+          <div class="prohibition-item">
+            <h4>🚫 Suicide & Self-Harm Encouragement</h4>
+            <p>Generating instructions, encouragement, or methods promoting self-harm, suicide, or eating disorders.</p>
+          </div>
+          <div class="prohibition-item">
+            <h4>🚫 Weaponization & Chemical/Biological Weapons</h4>
+            <p>Generating synthesis pathways, weaponization methodologies, or dispersion instructions for chemical, biological, radiological, or nuclear (CBRN) agents.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="aup-3">
+        <h2>3. Category-Specific Prohibitions</h2>
+        <p>You agree NOT to use the Service or its generated completions for any of the following activities:</p>
+
+        <h3>A. Fraud, Deception, Impersonation & Scams</h3>
+        <ul>
+          <li>Creating deceptive synthetic identities, phishing lures, fake bank notices, government spoofing documents, or advance-fee scam templates.</li>
+          <li>Impersonating living individuals, public officials, law enforcement personnel, or corporations without authorization (Section 66D, IT Act 2000).</li>
+          <li>Generating misleading financial advice, market manipulation schemes, fraudulent securities prospectuses, or deceptive cryptocurrency promotions.</li>
+        </ul>
+
+        <h3>B. Defamation, Harassment & Non-Consensual Imagery</h3>
+        <ul>
+          <li>Conducting targeted cyber-bullying, stalking, dox attacks, or intimidation campaigns against any individual.</li>
+          <li>Generating non-consensual deepfakes, intimate imagery, or fabricated explicit media depicting identifiable living persons (Section 66E and 67A, IT Act 2000).</li>
+          <li>Generating defamatory statements calculated to injure the reputation or livelihood of any person or legal entity.</li>
+        </ul>
+
+        <h3>C. Privacy Violations & Unauthorized Surveillance</h3>
+        <ul>
+          <li>Processing, extracting, or aggregating sensitive personal data without explicit legal consent under the <strong>Digital Personal Data Protection Act, 2023</strong>.</li>
+          <li>Attempting to reconstruct personal identifying numbers (such as Aadhaar, PAN, voter ID, passport details, or credit card CVVs).</li>
+        </ul>
+      </section>
+
+      <section id="aup-4">
+        <h2>4. Cyber Security & Unauthorized Access</h2>
+        <p>Under Sections 43, 66, and 66F of the Information Technology Act, 2000, you are strictly prohibited from utilizing the Service to:</p>
+        <ul>
+          <li><strong>Malware & Exploits:</strong> Write, refine, test, or distribute malicious code, trojan horses, ransomware, rootkits, worm propagation routines, or zero-day exploit payloads.</li>
+          <li><strong>Network Attacks:</strong> Execute unauthorized automated vulnerability scans, port knocking, credential stuffing, dictionary attacks, or penetration testing against any server without explicit written permission from the owner.</li>
+          <li><strong>System Tampering:</strong> Attempting to penetrate the host system running Antigravity Proxy, access arbitrary local files outside <code>public/media/</code>, or execute privilege escalation attacks.</li>
+        </ul>
+      </section>
+
+      <section id="aup-5">
+        <h2>5. Bypassing Third-Party Safety Guardrails & Provider Policies</h2>
+        <p>Antigravity Proxy functions as a protocol bridge, not a tool for defeating artificial intelligence safeguards:</p>
+        <ul>
+          <li><strong>No Jailbreaking / Adversarial Injections:</strong> You shall not use prompt injection, adversarial jailbreaking strings, or multi-turn exploits designed to force upstream models (Google Gemini, NVIDIA NIM) to violate their fundamental safety filters or terms.</li>
+          <li><strong>Respect Upstream Terms:</strong> You must maintain valid rights, subscriptions, or API access for all upstream accounts connected to the proxy. Using stolen accounts, unauthorized corporate cookies, or compromised API tokens is strictly prohibited.</li>
+          <li><strong>No Commercial Subversion:</strong> You shall not use the proxy to bypass geographic tiering or commercial resale restrictions imposed by upstream model vendors.</li>
+        </ul>
+      </section>
+
+      <section id="aup-6">
+        <h2>6. Infrastructure, Resource Abuse & Rate Limit Evasion</h2>
+        <p>To ensure fair operational access and avoid resource exhaustion on the local host and upstream APIs:</p>
+        <ul>
+          <li><strong>Respect Rate Limits:</strong> You must respect configured sliding window rate limits (120 RPM default). Generating distributed requests from multiple proxies or spoofing client IP headers (<code>X-Forwarded-For</code>) to bypass limits is considered malicious behavior.</li>
+          <li><strong>No Denial of Service:</strong> Flooding the server with excessive concurrent streaming requests, multi-gigabyte payloads, or malicious infinite token loops is strictly forbidden.</li>
+          <li><strong>Storage Pruning:</strong> If you utilize local media generation (<code>/v1/images/generations</code> or <code>/v1/videos/generations</code>), you must maintain reasonable storage quotas on the local disk.</li>
+        </ul>
+      </section>
+
+      <section id="aup-7">
+        <h2>7. Investigation, Enforcement & Penalties</h2>
+        <p>The Operator enforces this Policy through automated safeguards and administrative oversight:</p>
+        <ul>
+          <li><strong>Automated Rejection:</strong> The server employs parameter validation, rate limiting, and size boundaries to reject abusive traffic programmatically.</li>
+          <li><strong>Administrative Review:</strong> In the event of system instability, crash reports, or abuse alerts, the Operator may review aggregate metadata (status codes, request frequency, model usage).</li>
+          <li><strong>Penalties for Violation:</strong> The Operator reserves the right to take any of the following actions immediately without prior notice or liability:
+            <ol style="margin: 8px 0 0 20px;">
+              <li>Instant revocation and deletion of offending Proxy API keys.</li>
+              <li>Permanent firewall blacklisting of violating IP subnets.</li>
+              <li>Disconnection and invalidation of connected upstream session cookies.</li>
+              <li>Reporting the violation to upstream model vendors and appropriate law enforcement bodies.</li>
+            </ol>
+          </li>
+        </ul>
+      </section>
+
+      <section id="aup-8">
+        <h2>8. Mandatory Statutory Reporting & Law Enforcement Cooperation</h2>
+        <p>
+          In accordance with the <strong>Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021</strong> and the directions issued by the <strong>Indian Computer Emergency Response Team (CERT-In)</strong> under Section 70B(6) of the IT Act, 2000:
+        </p>
+        <p>
+          The Operator will cooperate fully with lawful orders, warrants, and directives issued by competent law enforcement agencies, cyber crime investigation cells, and judicial courts in India. When required by applicable statutory orders, relevant metadata and connection logs will be preserved and produced to investigating officers.
+        </p>
+      </section>
+
+      <section id="aup-9">
+        <h2>9. Reporting Abuse & Incident Contact</h2>
+        <p>
+          If you discover or suspect that an instance of Antigravity Proxy is being utilized in violation of this Policy, or if you identify a security vulnerability, please submit an immediate confidential report:
+        </p>
+        <div style="background:rgba(15,23,42,0.8); border:1px solid var(--card-border); padding:18px 22px; border-radius:10px; font-size:13.5px; margin-top:14px;">
+          <p style="margin-bottom:8px;"><strong>Abuse & Security Desk:</strong> <span class="placeholder">[abuse@yourdomain.com / Contact Email]</span></p>
+          <p style="margin-bottom:8px;"><strong>Incident Response Lead:</strong> <span class="placeholder">[Operator Name / Legal Entity]</span></p>
+          <p style="margin-bottom:0;"><strong>Jurisdiction:</strong> <span class="placeholder">[City, State, PIN Code, India]</span></p>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Antigravity Proxy Project &bull; Open-Source Local Interoperability Gateway</p>
+    <p style="margin-top:10px;">
+      <a href="/terms">Terms of Service</a> &bull;
+      <a href="/privacy">Privacy Policy</a> &bull;
+      <a href="/acceptable-use">Acceptable Use Policy</a> &bull;
+      <a href="/disclaimer">Legal Disclaimer</a>
+    </p>
+    <p style="margin-top:6px; font-size:11.5px; color:#64748b;">
+      Enforced under the Information Technology Act, 2000 of India. Zero tolerance for abusive conduct.
+    </p>
+  </footer>
+
+</body>
+</html>
