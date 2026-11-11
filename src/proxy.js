@@ -11,6 +11,7 @@ import { ANTIGRAVITY_ENDPOINT, USER_AGENT, refreshAccessToken } from './oauth.js
 import {
   getNextAccount,
   getRawAccount,
+  getEnabledAccounts,
   updateAccountToken,
   getStore,
   recordRequestMetric,
@@ -449,22 +450,28 @@ export function cleanBase64InText(text, host = 'http://localhost:4000') {
 
 // ───── Token management ─────
 
-async function ensureToken(account) {
+async function ensureToken(account, force = false) {
   if (account.isCookie || !account.refreshToken) {
     return account.accessToken || '';
   }
-  if (account.accessToken && account.expiresAt > Date.now() + 60_000) {
+  if (!force && account.accessToken && account.expiresAt > Date.now() + 60_000) {
     return account.accessToken;
   }
 
-  console.log(`[proxy] Refreshing token for ${account.email}...`);
-  const result = await refreshAccessToken(account.refreshToken);
-  account.accessToken = result.access_token;
-  account.expiresAt   = Date.now() + (result.expires_in || 3600) * 1000;
-  if (result.refresh_token) account.refreshToken = result.refresh_token;
+  console.log(`[proxy] ${force ? 'Forcing refresh of' : 'Refreshing'} token for ${account.email}...`);
+  try {
+    const result = await refreshAccessToken(account.refreshToken);
+    account.accessToken = result.access_token;
+    account.expiresAt   = Date.now() + (result.expires_in || 3600) * 1000;
+    if (result.refresh_token) account.refreshToken = result.refresh_token;
 
-  updateAccountToken(account.id, account.accessToken, result.expires_in, result.refresh_token);
-  return account.accessToken;
+    updateAccountToken(account.id, account.accessToken, result.expires_in, result.refresh_token);
+    return account.accessToken;
+  } catch (refreshErr) {
+    console.error(`[proxy] Token refresh failed for ${account.email}:`, refreshErr.message);
+    if (!account.accessToken) throw refreshErr;
+    return account.accessToken;
+  }
 }
 
 // ───── Multimodal Part Parsing (Text, Images, Videos, Audio, PDF) ─────
@@ -696,11 +703,31 @@ export function generateEmbedding(input, dims = 768) {
   return result;
 }
 
-function convertMessages(messages = []) {
+function convertMessages(messages = [], declaredTools = []) {
   let systemParts = [];
   const contents = [];
   const totalMsgs = messages.length;
   const toolCallMap = new Map();
+
+  const resolveToolName = (id, fallback) => {
+    let name = toolCallMap.get(id) || globalToolCallMap.get(id) || fallback;
+    if (!name || name === 'tool') {
+      if (Array.isArray(declaredTools) && declaredTools.length > 0) {
+        if (declaredTools.length === 1) {
+          name = declaredTools[0].function?.name || declaredTools[0].name || 'tool';
+        } else {
+          const match = declaredTools.find(t => {
+            const tName = t.function?.name || t.name;
+            return tName && (id?.includes(tName) || (fallback && fallback.includes(tName)));
+          });
+          name = match ? (match.function?.name || match.name) : (declaredTools[0].function?.name || declaredTools[0].name || 'tool');
+        }
+      } else {
+        name = name || 'tool';
+      }
+    }
+    return name;
+  };
 
   for (let i = 0; i < totalMsgs; i++) {
     const msg = messages[i];
@@ -774,7 +801,7 @@ function convertMessages(messages = []) {
     } else if (msg.role === 'tool') {
       // OpenAI tool response turn
       const toolId = msg.tool_call_id || '';
-      const fnName = toolCallMap.get(toolId) || globalToolCallMap.get(toolId) || msg.name || 'tool';
+      const fnName = resolveToolName(toolId, msg.name);
       let responseObj;
       if (typeof msg.content === 'object' && msg.content !== null) {
         responseObj = msg.content;
@@ -810,7 +837,7 @@ function convertMessages(messages = []) {
           if (!item) continue;
           if (item.type === 'tool_result') {
             const toolId = item.tool_use_id || '';
-            const fnName = toolCallMap.get(toolId) || globalToolCallMap.get(toolId) || 'tool';
+            const fnName = resolveToolName(toolId, item.name);
             let responseObj;
             if (typeof item.content === 'object' && item.content !== null) {
               responseObj = item.content;
@@ -1180,7 +1207,7 @@ export async function chatCompletion(body) {
   const startTime = Date.now();
   const promptText = extractLastUserPrompt(body.messages || []);
   const primaryModel = resolveModel(body.model || 'auto-fallback', promptText);
-  const { systemInstruction, contents } = convertMessages(body.messages || []);
+  const { systemInstruction, contents } = convertMessages(body.messages || [], body.tools);
   const tools = convertToolsToGemini(body.tools);
 
   const baseGenConfig = {};
@@ -1236,6 +1263,10 @@ export async function chatCompletion(body) {
         });
 
         const finishReason = (nimToolCalls && nimToolCalls.length > 0) ? 'tool_calls' : (choice?.finish_reason || 'stop');
+        let finalNimContent = text;
+        if (!finalNimContent && (!nimToolCalls || nimToolCalls.length === 0)) {
+          finalNimContent = choice?.message?.reasoning_content || "I have reviewed your request. How would you like me to proceed?";
+        }
 
         return {
           id: nimResult.id || `chatcmpl-${crypto.randomUUID().slice(0, 12)}`,
@@ -1246,7 +1277,7 @@ export async function chatCompletion(body) {
             index: 0,
             message: {
               role: 'assistant',
-              content: text || (nimToolCalls ? null : ''),
+              content: (nimToolCalls && nimToolCalls.length > 0) ? (finalNimContent || null) : finalNimContent,
               ...(choice?.message?.reasoning_content ? { reasoning_content: choice.message.reasoning_content } : {}),
               ...(nimToolCalls && nimToolCalls.length > 0 ? { tool_calls: nimToolCalls } : {}),
             },
@@ -1357,6 +1388,54 @@ export async function chatCompletion(body) {
         }
       } finally {
         clearTimeout(timeoutHandle);
+      }
+
+      // 401 Unauthorized: automatically force refresh OAuth token and retry immediately
+      if (res.status === 401 && acc.refreshToken) {
+        console.warn(`[chatCompletion] 401 Unauthorized on ${acc.email}. Forcing token refresh and retrying once...`);
+        try {
+          const freshToken = await ensureToken(acc, true);
+          const retryRes = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:generateContent`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${freshToken}`,
+              'Content-Type': 'application/json',
+              'User-Agent': USER_AGENT,
+            },
+            body: JSON.stringify(requestBody),
+          });
+          if (retryRes.ok) res = retryRes;
+        } catch (retryErr) {
+          console.warn(`[chatCompletion] Token refresh retry failed on ${acc.email}:`, retryErr.message);
+        }
+      }
+
+      // 429 Rate Limit: immediately attempt same model on alternate enabled account if available
+      if (res.status === 429 && !acc.isCookie) {
+        const otherAccounts = getEnabledAccounts().filter(a => a.id !== acc.id && !a.isCookie);
+        if (otherAccounts.length > 0) {
+          console.warn(`[chatCompletion] ${acc.email} rate-limited (429). Instantly attempting on alternate account ${otherAccounts[0].email}...`);
+          try {
+            const altAcc = otherAccounts[0];
+            const altToken = await ensureToken(altAcc);
+            const altBody = { ...requestBody, project: altAcc.projectId || requestBody.project };
+            const altRes = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:generateContent`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${altToken}`,
+                'Content-Type': 'application/json',
+                'User-Agent': USER_AGENT,
+              },
+              body: JSON.stringify(altBody),
+            });
+            if (altRes.ok) {
+              res = altRes;
+              acc = altAcc;
+            }
+          } catch (altErr) {
+            console.warn(`[chatCompletion] Alt-account failover failed:`, altErr.message);
+          }
+        }
       }
 
       if (res.ok) {
@@ -1470,6 +1549,11 @@ export async function chatCompletion(body) {
     status: 200,
   });
 
+  let finalContent = text;
+  if (!finalContent && toolCalls.length === 0) {
+    finalContent = thoughtText || "I have processed your request. How would you like me to proceed?";
+  }
+
   return {
     id:      `chatcmpl-${crypto.randomUUID().slice(0, 12)}`,
     object:  'chat.completion',
@@ -1479,7 +1563,7 @@ export async function chatCompletion(body) {
       index: 0,
       message: {
         role: 'assistant',
-        content: text || (toolCalls.length > 0 ? null : ''),
+        content: toolCalls.length > 0 ? (finalContent || null) : finalContent,
         ...(thoughtText ? { reasoning_content: thoughtText } : {}),
         ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
       },
@@ -1505,7 +1589,7 @@ export async function chatCompletionStream(body, res) {
   const startTime = Date.now();
   const promptText = extractLastUserPrompt(body.messages || []);
   const primaryModel = resolveModel(body.model || 'auto-fallback', promptText);
-  const { systemInstruction, contents } = convertMessages(body.messages || []);
+  const { systemInstruction, contents } = convertMessages(body.messages || [], body.tools);
   const tools = convertToolsToGemini(body.tools);
 
   const baseGenConfig = {};
@@ -1521,19 +1605,10 @@ export async function chatCompletionStream(body, res) {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
-  res.write(': keep-alive\n\n');
 
   let clientClosed = false;
-  const heartbeatTimer = setInterval(() => {
-    if (clientClosed) return;
-    try {
-      res.write(': heartbeat\n\n');
-    } catch {}
-  }, 4000);
-
   res.on('close', () => {
     clientClosed = true;
-    clearInterval(heartbeatTimer);
   });
 
   const steps = resolveExecutionSteps(primaryModel);
@@ -1696,6 +1771,56 @@ export async function chatCompletionStream(body, res) {
         clearTimeout(timeoutId);
       }
 
+      // 401 Unauthorized: automatically force refresh OAuth token and retry immediately
+      if (attempt.status === 401 && acc.refreshToken) {
+        console.warn(`[chatCompletionStream] 401 Unauthorized on ${acc.email}. Forcing token refresh and retrying once...`);
+        try {
+          const freshToken = await ensureToken(acc, true);
+          const retryAttempt = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${freshToken}`,
+              'Content-Type': 'application/json',
+              'User-Agent': USER_AGENT,
+              Accept: 'text/event-stream',
+            },
+            body: JSON.stringify(requestBody),
+          });
+          if (retryAttempt.ok) attempt = retryAttempt;
+        } catch (retryErr) {
+          console.warn(`[chatCompletionStream] Token refresh retry failed on ${acc.email}:`, retryErr.message);
+        }
+      }
+
+      // 429 Rate Limit: immediately attempt same model on alternate enabled account if available
+      if (attempt.status === 429 && !acc.isCookie) {
+        const otherAccounts = getEnabledAccounts().filter(a => a.id !== acc.id && !a.isCookie);
+        if (otherAccounts.length > 0) {
+          console.warn(`[chatCompletionStream] ${acc.email} rate-limited (429). Instantly attempting on alternate account ${otherAccounts[0].email}...`);
+          try {
+            const altAcc = otherAccounts[0];
+            const altToken = await ensureToken(altAcc);
+            const altBody = { ...requestBody, project: altAcc.projectId || requestBody.project };
+            const altAttempt = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${altToken}`,
+                'Content-Type': 'application/json',
+                'User-Agent': USER_AGENT,
+                Accept: 'text/event-stream',
+              },
+              body: JSON.stringify(altBody),
+            });
+            if (altAttempt.ok) {
+              attempt = altAttempt;
+              acc = altAcc;
+            }
+          } catch (altErr) {
+            console.warn(`[chatCompletionStream] Alt-account failover failed:`, altErr.message);
+          }
+        }
+      }
+
       if (attempt.ok) {
         upstream = attempt;
         modelUsed = m;
@@ -1713,7 +1838,6 @@ export async function chatCompletionStream(body, res) {
   }
 
   if (!upstream) {
-    clearInterval(heartbeatTimer);
     console.warn('[chatCompletionStream] All upstream models returned errors. Sending graceful notice...');
     let notice = "⚠️ Upstream models are temporarily busy or rate-limited. Please wait a moment or check your account quota at http://localhost:4000.";
     if (promptText && /\b(image|draw|picture|photo)\b/i.test(promptText)) {
@@ -1724,7 +1848,7 @@ export async function chatCompletionStream(body, res) {
       object: 'chat.completion.chunk',
       created: Math.floor(Date.now() / 1000),
       model: body.model || modelUsed,
-      choices: [{ index: 0, delta: { content: notice }, finish_reason: null }],
+      choices: [{ index: 0, delta: { role: 'assistant', content: notice }, finish_reason: null }],
     };
     res.write(`data: ${JSON.stringify(chunk)}\n\n`);
     res.write(`data: ${JSON.stringify({ id: completionId, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model: body.model || modelUsed, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`);
@@ -1732,10 +1856,21 @@ export async function chatCompletionStream(body, res) {
     return res.end();
   }
 
+  // 1. Send initial assistant role chunk (OpenAI spec requirement for OpenClaw & agent frameworks)
+  res.write(`data: ${JSON.stringify({
+    id: completionId,
+    object: 'chat.completion.chunk',
+    created: Math.floor(Date.now() / 1000),
+    model: body.model || modelUsed,
+    choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }],
+  })}\n\n`);
+
   const reader = upstream.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   let streamTotalText = '';
+  let streamReasoningText = '';
+  let streamErrorMsg = null;
   let toolIndex = 0;
   let hadToolCalls = false;
 
@@ -1755,6 +1890,11 @@ export async function chatCompletionStream(body, res) {
 
         try {
           const parsed = JSON.parse(payload);
+          if (parsed.error) {
+            console.warn('[chatCompletionStream] Upstream error chunk:', parsed.error);
+            streamErrorMsg = parsed.error.message || parsed.error.status || 'Upstream error';
+            continue;
+          }
           if (upstreamIsNvidia) {
             const delta = parsed.choices?.[0]?.delta || {};
             const text = delta.content || '';
@@ -1762,6 +1902,7 @@ export async function chatCompletionStream(body, res) {
             const nimTools = delta.tool_calls;
 
             if (reasoning) {
+              streamReasoningText += reasoning;
               res.write(`data: ${JSON.stringify({
                 id: completionId,
                 object: 'chat.completion.chunk',
@@ -1794,12 +1935,23 @@ export async function chatCompletionStream(body, res) {
             }
           } else {
             const inner = parsed.response || parsed;
+            if (inner.error) {
+              console.warn('[chatCompletionStream] Upstream inner error:', inner.error);
+              streamErrorMsg = inner.error.message || inner.error.status || 'Model error';
+              continue;
+            }
             const candidate = inner.candidates?.[0];
+            if (candidate?.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'stop') {
+              if (candidate.finishReason === 'SAFETY') {
+                streamErrorMsg = 'Response was filtered due to safety policies.';
+              }
+            }
             const parts = candidate?.content?.parts || [];
 
             for (const p of parts) {
               if (p.thought) {
                 if (p.text) {
+                  streamReasoningText += p.text;
                   res.write(`data: ${JSON.stringify({
                     id: completionId,
                     object: 'chat.completion.chunk',
@@ -1879,6 +2031,27 @@ export async function chatCompletionStream(body, res) {
     console.error('[proxy stream error]', err.message);
   }
 
+  // CRITICAL: Guarantee non-empty content payload if no tool calls were made (prevents OpenClaw payloads=0 error)
+  if (!streamTotalText && !hadToolCalls) {
+    let fallbackText = '';
+    if (streamReasoningText) {
+      // Gemini answered in thought blocks; bridge to content so OpenClaw and standard LLM clients receive valid payload
+      fallbackText = streamReasoningText;
+    } else if (streamErrorMsg) {
+      fallbackText = `⚠️ Upstream Notice: ${streamErrorMsg}`;
+    } else {
+      fallbackText = "I have processed your request. How would you like me to proceed?";
+    }
+    res.write(`data: ${JSON.stringify({
+      id: completionId,
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      model: body.model || modelUsed,
+      choices: [{ index: 0, delta: { content: fallbackText }, finish_reason: null }],
+    })}\n\n`);
+    streamTotalText = fallbackText;
+  }
+
   const estCompTokens = Math.max(1, Math.round(streamTotalText.length / 4));
   recordRequestMetric({
     model: body.model || modelUsed,
@@ -1896,7 +2069,6 @@ export async function chatCompletionStream(body, res) {
     model:   body.model || modelUsed,
     choices: [{ index: 0, delta: {}, finish_reason: hadToolCalls ? 'tool_calls' : 'stop' }],
   };
-  clearInterval(heartbeatTimer);
   res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
   res.write('data: [DONE]\n\n');
   res.end();
@@ -2007,7 +2179,7 @@ export async function anthropicMessageStream(body, res) {
   const openAiReq = normalizeAnthropicToOpenAI(body);
   const promptText = extractLastUserPrompt(openAiReq.messages || []);
   const primaryModel = resolveModel(openAiReq.model || 'auto-fallback', promptText);
-  const { systemInstruction, contents } = convertMessages(openAiReq.messages || []);
+  const { systemInstruction, contents } = convertMessages(openAiReq.messages || [], openAiReq.tools || body.tools);
   const tools = convertToolsToGemini(openAiReq.tools || body.tools);
 
   const baseGenConfig = {};
@@ -2023,19 +2195,10 @@ export async function anthropicMessageStream(body, res) {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
-  res.write(': keep-alive\n\n');
 
   let clientClosed = false;
-  const heartbeatTimer = setInterval(() => {
-    if (clientClosed) return;
-    try {
-      res.write(': heartbeat\n\n');
-    } catch {}
-  }, 4000);
-
   res.on('close', () => {
     clientClosed = true;
-    clearInterval(heartbeatTimer);
   });
 
   const steps = resolveExecutionSteps(primaryModel);
@@ -2198,6 +2361,56 @@ export async function anthropicMessageStream(body, res) {
         clearTimeout(timeoutId);
       }
 
+      // 401 Unauthorized: automatically force refresh OAuth token and retry immediately
+      if (attempt.status === 401 && acc.refreshToken) {
+        console.warn(`[anthropic stream] 401 Unauthorized on ${acc.email}. Forcing token refresh and retrying once...`);
+        try {
+          const freshToken = await ensureToken(acc, true);
+          const retryAttempt = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`, {
+            method: 'POST',
+            headers: {
+              Authorization:  `Bearer ${freshToken}`,
+              'Content-Type': 'application/json',
+              'User-Agent':   USER_AGENT,
+              Accept:         'text/event-stream',
+            },
+            body: JSON.stringify(requestBody),
+          });
+          if (retryAttempt.ok) attempt = retryAttempt;
+        } catch (retryErr) {
+          console.warn(`[anthropic stream] Token refresh retry failed on ${acc.email}:`, retryErr.message);
+        }
+      }
+
+      // 429 Rate Limit: immediately attempt same model on alternate enabled account if available
+      if (attempt.status === 429 && !acc.isCookie) {
+        const otherAccounts = getEnabledAccounts().filter(a => a.id !== acc.id && !a.isCookie);
+        if (otherAccounts.length > 0) {
+          console.warn(`[anthropic stream] ${acc.email} rate-limited (429). Instantly attempting on alternate account ${otherAccounts[0].email}...`);
+          try {
+            const altAcc = otherAccounts[0];
+            const altToken = await ensureToken(altAcc);
+            const altBody = { ...requestBody, project: altAcc.projectId || requestBody.project };
+            const altAttempt = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${altToken}`,
+                'Content-Type': 'application/json',
+                'User-Agent': USER_AGENT,
+                Accept: 'text/event-stream',
+              },
+              body: JSON.stringify(altBody),
+            });
+            if (altAttempt.ok) {
+              attempt = altAttempt;
+              acc = altAcc;
+            }
+          } catch (altErr) {
+            console.warn(`[anthropic stream] Alt-account failover failed:`, altErr.message);
+          }
+        }
+      }
+
       if (attempt.ok) {
         upstream = attempt;
         modelUsed = m;
@@ -2215,7 +2428,6 @@ export async function anthropicMessageStream(body, res) {
   }
 
   if (!upstream) {
-    clearInterval(heartbeatTimer);
     console.warn('[anthropic stream] All upstream models returned errors. Sending graceful fallback message to Claude...');
     res.write(`event: message_start\ndata: ${JSON.stringify({
       type: 'message_start',
@@ -2283,6 +2495,8 @@ export async function anthropicMessageStream(body, res) {
   const decoder = new TextDecoder();
   let buffer = '';
   let streamTotalText = '';
+  let streamReasoningText = '';
+  let streamErrorMsg = null;
   let currentBlockIndex = 0;
   let currentBlockType = null;
   let hadToolCalls = false;
@@ -2303,6 +2517,11 @@ export async function anthropicMessageStream(body, res) {
 
         try {
           const parsed = JSON.parse(payload);
+          if (parsed.error) {
+            console.warn('[anthropic stream] Upstream error chunk:', parsed.error);
+            streamErrorMsg = parsed.error.message || parsed.error.status || 'Upstream error';
+            continue;
+          }
           if (upstreamIsNvidia) {
             const delta = parsed.choices?.[0]?.delta || {};
             const text = delta.content || '';
@@ -2310,6 +2529,7 @@ export async function anthropicMessageStream(body, res) {
             const nimTools = delta.tool_calls;
 
             if (reasoning) {
+              streamReasoningText += reasoning;
               if (currentBlockType !== 'thinking') {
                 if (currentBlockType !== null) {
                   res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
@@ -2348,12 +2568,23 @@ export async function anthropicMessageStream(body, res) {
             }
           } else {
             const inner = parsed.response || parsed;
+            if (inner.error) {
+              console.warn('[anthropic stream] Upstream inner error:', inner.error);
+              streamErrorMsg = inner.error.message || inner.error.status || 'Model error';
+              continue;
+            }
             const candidate = inner.candidates?.[0];
+            if (candidate?.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'stop') {
+              if (candidate.finishReason === 'SAFETY') {
+                streamErrorMsg = 'Response was filtered due to safety policies.';
+              }
+            }
             const parts = candidate?.content?.parts || [];
 
             for (const p of parts) {
               if (p.thought) {
                 if (p.text) {
+                  streamReasoningText += p.text;
                   if (currentBlockType !== 'thinking') {
                     if (currentBlockType !== null) {
                       res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
@@ -2429,7 +2660,7 @@ export async function anthropicMessageStream(body, res) {
 
   if (!streamTotalText && !hadToolCalls) {
     res.write(`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'text', text: '' } })}\n\n`);
-    const fallbackNotice = "⚠️ Proxy Notice: Upstream stream produced no output or was interrupted. Try again or check models in your Combo.";
+    const fallbackNotice = streamReasoningText || streamErrorMsg || "⚠️ Proxy Notice: Upstream stream produced no output or was interrupted. Try again or check models in your Combo.";
     res.write(`event: content_block_delta\ndata: ${JSON.stringify({
       type: 'content_block_delta',
       index: currentBlockIndex,
@@ -2456,7 +2687,6 @@ export async function anthropicMessageStream(body, res) {
   })}\n\n`);
 
   // 5. message_stop
-  clearInterval(heartbeatTimer);
   res.write(`event: message_stop\ndata: ${JSON.stringify({
     type: 'message_stop'
   })}\n\n`);

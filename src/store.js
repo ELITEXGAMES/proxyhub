@@ -206,6 +206,11 @@ export function getNextAccount() {
   return acc;
 }
 
+export function getEnabledAccounts() {
+  const s = getStore();
+  return (s.accounts || []).filter(a => a && a.enabled);
+}
+
 // ───── API Keys ─────
 
 export function getApiKeys() {
