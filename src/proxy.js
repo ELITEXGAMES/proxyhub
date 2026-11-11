@@ -568,11 +568,11 @@ function parseParts(content, isRecent = true) {
   return parts.length > 0 ? parts : [{ text: '' }];
 }
 
-export function cleanSchemaForGemini(schema) {
+export function cleanSchemaForGemini(schema, isRoot = true) {
   if (!schema || typeof schema !== 'object') return { type: 'object', properties: {} };
 
   if (Array.isArray(schema)) {
-    return cleanSchemaForGemini(schema[0]);
+    return cleanSchemaForGemini(schema[0], isRoot);
   }
 
   // Handle anyOf / oneOf / allOf
@@ -587,7 +587,7 @@ export function cleanSchemaForGemini(schema) {
       if (Array.isArray(list) && list.some(s => s && s.type === 'null')) {
         merged.nullable = true;
       }
-      return cleanSchemaForGemini(merged);
+      return cleanSchemaForGemini(merged, isRoot);
     }
   }
 
@@ -640,21 +640,38 @@ export function cleanSchemaForGemini(schema) {
   if (schema.properties && typeof schema.properties === 'object' && !Array.isArray(schema.properties)) {
     cleaned.properties = {};
     for (const [propK, propV] of Object.entries(schema.properties)) {
-      cleaned.properties[propK] = cleanSchemaForGemini(propV);
+      cleaned.properties[propK] = cleanSchemaForGemini(propV, false);
     }
-  } else if (cleaned.type === 'object') {
-    cleaned.properties = {};
   }
 
-  // 7. required
+  // Google Gemini API rule: An OBJECT type must have declared properties.
+  // If an arbitrary dict/object has no declared properties, nested objects cause HTTP 400.
+  if (cleaned.type === 'object') {
+    if (!cleaned.properties || Object.keys(cleaned.properties).length === 0) {
+      if (isRoot) {
+        cleaned.properties = {};
+      } else {
+        // Convert nested open dict to string to guarantee Google Gemini acceptance
+        cleaned.type = 'string';
+        cleaned.description = (cleaned.description ? `${cleaned.description} ` : '') + '(JSON string or key-value map)';
+        delete cleaned.properties;
+      }
+    }
+  }
+
+  // 7. required (must only reference declared properties)
   if (Array.isArray(schema.required)) {
-    const validReq = schema.required.filter(r => typeof r === 'string');
+    const validReq = schema.required.filter(r => typeof r === 'string' && (!cleaned.properties || cleaned.properties[r]));
     if (validReq.length > 0) cleaned.required = validReq;
   }
 
   // 8. items
-  if (schema.items && typeof schema.items === 'object') {
-    cleaned.items = cleanSchemaForGemini(schema.items);
+  if (cleaned.type === 'array') {
+    if (schema.items && typeof schema.items === 'object') {
+      cleaned.items = cleanSchemaForGemini(schema.items, false);
+    } else {
+      cleaned.items = { type: 'string' };
+    }
   }
 
   return cleaned;
@@ -670,13 +687,13 @@ export function convertToolsToGemini(tools) {
       functionDeclarations.push({
         name: t.function.name,
         description: t.function.description || '',
-        parameters: cleanSchemaForGemini(t.function.parameters),
+        parameters: cleanSchemaForGemini(t.function.parameters, true),
       });
     } else if (t.name) {
       functionDeclarations.push({
         name: t.name,
         description: t.description || '',
-        parameters: cleanSchemaForGemini(t.input_schema || t.parameters),
+        parameters: cleanSchemaForGemini(t.input_schema || t.parameters, true),
       });
     }
   }
@@ -703,7 +720,91 @@ export function generateEmbedding(input, dims = 768) {
   return result;
 }
 
-function convertMessages(messages = [], declaredTools = []) {
+export function enforceGeminiTurnAlternation(rawContents) {
+  if (!Array.isArray(rawContents) || rawContents.length === 0) {
+    return [{ role: 'user', parts: [{ text: 'Hello' }] }];
+  }
+
+  const normalized = [];
+  for (let i = 0; i < rawContents.length; i++) {
+    const turn = rawContents[i];
+    if (!turn || !turn.parts || turn.parts.length === 0) continue;
+    const parts = turn.parts.filter(Boolean);
+    if (parts.length === 0) continue;
+
+    const hasFnResp = parts.some(p => p.functionResponse);
+    const hasTextOrMedia = parts.some(p => !p.functionResponse);
+
+    if (turn.role === 'user' && hasFnResp && hasTextOrMedia) {
+      const fnParts = parts.filter(p => p.functionResponse);
+      const otherParts = parts.filter(p => !p.functionResponse);
+      if (fnParts.length > 0) {
+        normalized.push({ role: 'user', parts: fnParts, _isFnResp: true });
+      }
+      if (otherParts.length > 0) {
+        normalized.push({ role: 'user', parts: otherParts, _isFnResp: false });
+      }
+    } else {
+      normalized.push({
+        role: turn.role === 'model' ? 'model' : 'user',
+        parts,
+        _isFnResp: turn.role === 'user' && hasFnResp,
+      });
+    }
+  }
+
+  if (normalized.length === 0) {
+    return [{ role: 'user', parts: [{ text: 'Hello' }] }];
+  }
+
+  const alternated = [];
+  for (let i = 0; i < normalized.length; i++) {
+    const current = normalized[i];
+    if (alternated.length === 0) {
+      if (current.role === 'model') {
+        alternated.push({ role: 'user', parts: [{ text: 'Hello' }] });
+      }
+      alternated.push({ role: current.role, parts: current.parts, _isFnResp: current._isFnResp });
+      continue;
+    }
+
+    const prev = alternated[alternated.length - 1];
+    if (prev.role === current.role) {
+      if (current.role === 'user') {
+        if (prev._isFnResp && current._isFnResp) {
+          prev.parts.push(...current.parts);
+        } else if (!prev._isFnResp && !current._isFnResp) {
+          prev.parts.push(...current.parts);
+        } else {
+          alternated.push({ role: 'model', parts: [{ text: 'Tool results received.' }] });
+          alternated.push({ role: current.role, parts: current.parts, _isFnResp: current._isFnResp });
+        }
+      } else {
+        prev.parts.push(...current.parts);
+      }
+    } else {
+      alternated.push({ role: current.role, parts: current.parts, _isFnResp: current._isFnResp });
+    }
+  }
+
+  for (const c of alternated) {
+    delete c._isFnResp;
+    if (!c.parts || c.parts.length === 0) {
+      c.parts = [{ text: '' }];
+    }
+  }
+
+  if (alternated.length === 0) {
+    alternated.push({ role: 'user', parts: [{ text: 'Hello' }] });
+  }
+  if (alternated[0].role !== 'user') {
+    alternated.unshift({ role: 'user', parts: [{ text: 'Hello' }] });
+  }
+
+  return alternated;
+}
+
+export function convertMessages(messages = [], declaredTools = []) {
   let systemParts = [];
   const contents = [];
   const totalMsgs = messages.length;
@@ -824,10 +925,12 @@ function convertMessages(messages = [], declaredTools = []) {
           response: responseObj,
         }
       };
-      if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+      // CRITICAL: A functionResponse turn in Gemini must strictly contain ONLY functionResponse parts.
+      // Never mix functionResponse with regular user text in the same turn!
+      if (contents.length > 0 && contents[contents.length - 1].role === 'user' && contents[contents.length - 1]._isFnResp) {
         contents[contents.length - 1].parts.push(toolPart);
       } else {
-        contents.push({ role: 'user', parts: [toolPart] });
+        contents.push({ role: 'user', parts: [toolPart], _isFnResp: true });
       }
     } else {
       // User turn (may include Anthropic tool_result blocks)
@@ -869,35 +972,31 @@ function convertMessages(messages = [], declaredTools = []) {
       }
 
       const cleanUserParts = parts.length > 0 ? parts : [{ text: '' }];
+      const hasFnResp = cleanUserParts.some(p => p.functionResponse);
 
-      if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
-        contents[contents.length - 1].parts.push(...cleanUserParts);
+      if (hasFnResp) {
+        if (contents.length > 0 && contents[contents.length - 1].role === 'user' && contents[contents.length - 1]._isFnResp) {
+          contents[contents.length - 1].parts.push(...cleanUserParts);
+        } else {
+          contents.push({ role: 'user', parts: cleanUserParts, _isFnResp: true });
+        }
       } else {
-        contents.push({ role: 'user', parts: cleanUserParts });
+        if (contents.length > 0 && contents[contents.length - 1].role === 'user' && !contents[contents.length - 1]._isFnResp) {
+          contents[contents.length - 1].parts.push(...cleanUserParts);
+        } else {
+          contents.push({ role: 'user', parts: cleanUserParts });
+        }
       }
     }
   }
 
-  // Guarantee valid structure for Gemini API
-  if (contents.length === 0) {
-    contents.push({ role: 'user', parts: [{ text: 'Hello' }] });
-  }
-  if (contents[0].role !== 'user') {
-    contents.unshift({ role: 'user', parts: [{ text: 'Hello' }] });
-  }
-
-  // Ensure each turn has at least one valid part
-  for (const c of contents) {
-    if (!c.parts || c.parts.length === 0) {
-      c.parts = [{ text: '' }];
-    }
-  }
+  const finalContents = enforceGeminiTurnAlternation(contents);
 
   const systemInstruction = systemParts.length > 0
     ? { parts: systemParts }
     : undefined;
 
-  return { systemInstruction, contents };
+  return { systemInstruction, contents: finalContents };
 }
 
 // ───── Response Part Formatter (handles generated text & clean saved media) ─────
@@ -1341,6 +1440,10 @@ export async function chatCompletion(body) {
       else if (isVid) stepGenConfig.responseModalities = ['VIDEO'];
       if (step.model === 'gemini-web-thinking') {
         stepGenConfig.thinkingConfig = { thinkingBudget: 4096 };
+      } else if (!step.model.includes('thinking') && !(body.model && body.model.includes('thinking')) && body.thinking === undefined) {
+        if (actualModel.includes('2.5-flash') || actualModel.includes('2.0-flash')) {
+          stepGenConfig.thinkingConfig = { thinkingBudget: 0 };
+        }
       }
 
       const requestBody = {
@@ -1446,6 +1549,42 @@ export async function chatCompletion(body) {
       }
 
       const errText = await res.text();
+
+      // If upstream returned 400 Bad Request and tools were passed, retry once without tools
+      if (res.status === 400 && tools && tools.length > 0) {
+        console.warn(`[chatCompletion] Step ${i + 1}/${steps.length} (${m}) returned 400 Bad Request: ${errText.slice(0, 150)}. Retrying step without tools...`);
+        try {
+          const strippedReqBody = {
+            ...requestBody,
+            request: {
+              contents,
+              ...(systemInstruction && { systemInstruction }),
+              ...(Object.keys(stepGenConfig).length && { generationConfig: stepGenConfig }),
+            }
+          };
+          const retryRes = await fetch(
+            token.startsWith('AIzaSy')
+              ? `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${token}`
+              : `${ANTIGRAVITY_ENDPOINT}/v1internal:generateContent`,
+            {
+              method: 'POST',
+              headers: token.startsWith('AIzaSy')
+                ? { 'Content-Type': 'application/json' }
+                : { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'User-Agent': USER_AGENT },
+              body: JSON.stringify(token.startsWith('AIzaSy') ? strippedReqBody.request : strippedReqBody),
+            }
+          );
+          if (retryRes.ok) {
+            finalRes = await retryRes.json();
+            modelUsed = m;
+            accountUsed = acc;
+            break;
+          }
+        } catch (retryE) {
+          console.warn(`[chatCompletion] Stripped-tool retry failed:`, retryE.message);
+        }
+      }
+
       lastErr = new Error(`Antigravity API error (${res.status}): ${errText}`);
       console.warn(`[chatCompletion] Step ${i + 1}/${steps.length} (${m} on ${acc.email}) returned ${res.status}: ${errText.slice(0, 150)}. Falling back to next step with full context preserved...`);
       await new Promise(r => setTimeout(r, 200));
@@ -1635,7 +1774,7 @@ export async function chatCompletionStream(body, res) {
 
         const formattedMessages = formatMessagesForOpenAI(body.messages || []);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const timeoutId = setTimeout(() => controller.abort(), 45000);
         let attempt;
         try {
           attempt = await fetch(NVIDIA_NIM_ENDPOINT, {
@@ -1717,6 +1856,10 @@ export async function chatCompletionStream(body, res) {
       else if (isVid) stepGenConfig.responseModalities = ['VIDEO'];
       if (step.model === 'gemini-web-thinking') {
         stepGenConfig.thinkingConfig = { thinkingBudget: 4096 };
+      } else if (!step.model.includes('thinking') && !(body.model && body.model.includes('thinking')) && body.thinking === undefined) {
+        if (actualModel.includes('2.5-flash') || actualModel.includes('2.0-flash')) {
+          stepGenConfig.thinkingConfig = { thinkingBudget: 0 };
+        }
       }
 
       const requestBody = {
@@ -1829,6 +1972,42 @@ export async function chatCompletionStream(body, res) {
       }
 
       const errText = await attempt.text();
+
+      // If upstream returned 400 Bad Request and tools were passed, retry once without tools
+      if (attempt.status === 400 && tools && tools.length > 0) {
+        console.warn(`[chatCompletionStream] Step ${i + 1}/${steps.length} (${m}) returned 400 Bad Request: ${errText.slice(0, 150)}. Retrying step without tools...`);
+        try {
+          const strippedReqBody = {
+            ...requestBody,
+            request: {
+              contents,
+              ...(systemInstruction && { systemInstruction }),
+              ...(Object.keys(stepGenConfig).length && { generationConfig: stepGenConfig }),
+            }
+          };
+          const retryAttempt = await fetch(
+            token.startsWith('AIzaSy')
+              ? `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse&key=${token}`
+              : `${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`,
+            {
+              method: 'POST',
+              headers: token.startsWith('AIzaSy')
+                ? { 'Content-Type': 'application/json', Accept: 'text/event-stream' }
+                : { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'User-Agent': USER_AGENT, Accept: 'text/event-stream' },
+              body: JSON.stringify(token.startsWith('AIzaSy') ? strippedReqBody.request : strippedReqBody),
+            }
+          );
+          if (retryAttempt.ok) {
+            upstream = retryAttempt;
+            modelUsed = m;
+            accountUsed = acc;
+            break;
+          }
+        } catch (retryE) {
+          console.warn(`[chatCompletionStream] Stripped-tool retry failed:`, retryE.message);
+        }
+      }
+
       console.warn(`[chatCompletionStream] Step ${i + 1}/${steps.length} (${m} on ${acc.email}) returned ${attempt.status}: ${errText.slice(0, 150)}. Falling back to next step with full context preserved...`);
       await new Promise(r => setTimeout(r, 200));
       continue;
@@ -1978,7 +2157,7 @@ export async function chatCompletionStream(body, res) {
                     index: 0,
                     delta: {
                       tool_calls: [{
-                        index: toolIndex++,
+                        index: 0,
                         id: toolCallId,
                         type: 'function',
                         function: {
@@ -2307,6 +2486,10 @@ export async function anthropicMessageStream(body, res) {
       else if (isVid) stepGenConfig.responseModalities = ['VIDEO'];
       if (step.model === 'gemini-web-thinking') {
         stepGenConfig.thinkingConfig = { thinkingBudget: 4096 };
+      } else if (!step.model.includes('thinking') && !(body.model && body.model.includes('thinking')) && body.thinking === undefined) {
+        if (actualModel.includes('2.5-flash') || actualModel.includes('2.0-flash')) {
+          stepGenConfig.thinkingConfig = { thinkingBudget: 0 };
+        }
       }
 
       const requestBody = {
