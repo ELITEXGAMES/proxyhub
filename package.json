@@ -1,6 +1,6 @@
 {
   "name": "antigravity-proxy",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "High-speed OpenAI & Anthropic compatible API proxy for Antigravity & NVIDIA NIM accounts with web dashboard",
   "type": "module",
   "main": "server.js",

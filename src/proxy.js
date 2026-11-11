@@ -1518,22 +1518,31 @@ async function fetchGeminiWithRecovery({
 }
 
 /**
- * Shared SSE stream line parser that handles \r\n, optional space after "data:", and final unflushed buffer.
+ * Shared SSE stream line parser that handles \r\n, optional space after "data:",
+ * final unflushed buffer, and raw JSON non-SSE fallback payloads.
  */
 async function readSseStream(reader, onJsonPayload) {
   const decoder = new TextDecoder();
   let buffer = '';
+  let sawSseData = false;
+  let nonSseAccum = '';
 
   const processLine = (rawLine) => {
     const line = rawLine.replace(/\r$/, '');
-    if (!line.startsWith('data:')) return;
-    const payload = line.slice(5).trim();
-    if (!payload || payload === '[DONE]') return;
-    try {
-      const parsed = JSON.parse(payload);
-      onJsonPayload(parsed);
-    } catch {
-      // Ignore partial/malformed keepalive frames
+    if (line.startsWith('data:')) {
+      sawSseData = true;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') return;
+      try {
+        const parsed = JSON.parse(payload);
+        onJsonPayload(parsed);
+      } catch {
+        // Ignore partial/malformed keepalive frames
+      }
+      return;
+    }
+    if (!sawSseData && line.trim()) {
+      nonSseAccum += (nonSseAccum ? '\n' : '') + line;
     }
   };
 
@@ -1550,6 +1559,18 @@ async function readSseStream(reader, onJsonPayload) {
   buffer += decoder.decode();
   if (buffer.trim()) {
     for (const line of buffer.split('\n')) processLine(line);
+  }
+
+  // Fallback: if upstream returned plain JSON (object or array) without SSE "data:" prefix
+  if (!sawSseData && nonSseAccum.trim()) {
+    try {
+      const parsed = JSON.parse(nonSseAccum.trim());
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) onJsonPayload(item);
+      } else if (parsed && typeof parsed === 'object') {
+        onJsonPayload(parsed);
+      }
+    } catch {}
   }
 }
 

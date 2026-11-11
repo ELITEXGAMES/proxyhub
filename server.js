@@ -110,6 +110,11 @@ import {
   generateEmbedding,
 } from './src/proxy.js';
 
+let SERVER_VERSION = '1.0.3';
+try {
+  SERVER_VERSION = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8')).version || SERVER_VERSION;
+} catch {}
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -228,7 +233,7 @@ function dashboardAuth(req, res, next) {
 
 // ---------- Health ----------
 app.get('/v1/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: Date.now() });
+  res.json({ status: 'ok', version: SERVER_VERSION, timestamp: Date.now() });
 });
 
 // ---------- Model list (OpenAI compatible) ----------
