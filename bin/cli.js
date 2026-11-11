@@ -311,7 +311,7 @@ async function cmdUpdate(args) {
   console.log('  🔄 Updating Antigravity Proxy to Latest Version');
   console.log('=============================================================\n');
 
-  let wasRunning = !!getRunningPid();
+  let wasRunning = !!(getRunningPid() || await checkHttpAlive(DEFAULT_PORT));
   if (wasRunning) {
     console.log('📦 Proxy is currently running. Will restart after update.');
   }
@@ -341,7 +341,6 @@ async function cmdUpdate(args) {
 
       console.log(`   Repository: https://github.com/ELITEXGAMES/proxyhub.git (${currentBranch})`);
 
-      // Stash any accidental local modifications to preserve user changes cleanly
       let stashed = false;
       try {
         const status = execSync('git status --porcelain', { cwd: ROOT_DIR, encoding: 'utf-8' }).trim();
@@ -362,30 +361,32 @@ async function cmdUpdate(args) {
         try { execSync('git stash pop', { cwd: ROOT_DIR, stdio: 'ignore' }); } catch {}
       }
 
-      // Show recent commit
       try {
         const lastCommit = execSync('git log -1 --pretty=format:"%h - %s (%cr) <%an>"', { cwd: ROOT_DIR, encoding: 'utf-8' }).trim();
         console.log(`\n📌 Updated to latest commit: ${lastCommit}`);
       } catch {}
-
     } catch (gitErr) {
       console.error(`\n❌ Git update encountered an error: ${gitErr.message}`);
       console.log('   Continuing with dependency and health check...\n');
     }
   } else {
-    // Standalone downloaded zip: download latest zip directly from GitHub
-    console.log('📥 Fetching latest release from https://github.com/ELITEXGAMES/proxyhub/archive/refs/heads/main.zip...');
+    // Standalone or npm-installed package: fetch latest tarball (uses built-in tar on Linux/macOS, PowerShell on Windows)
+    console.log('📥 Fetching latest release from https://github.com/ELITEXGAMES/proxyhub...');
     try {
-      const zipUrl = 'https://github.com/ELITEXGAMES/proxyhub/archive/refs/heads/main.zip';
-      const tempZip = path.join(os.tmpdir(), 'proxyhub-latest.zip');
       const tempDir = path.join(os.tmpdir(), 'proxyhub-extract');
       if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
       fs.mkdirSync(tempDir, { recursive: true });
 
       if (process.platform === 'win32') {
+        const zipUrl = 'https://github.com/ELITEXGAMES/proxyhub/archive/refs/heads/main.zip';
+        const tempZip = path.join(os.tmpdir(), 'proxyhub-latest.zip');
         execSync(`powershell -NoProfile -Command "Invoke-WebRequest -Uri '${zipUrl}' -OutFile '${tempZip}'; Expand-Archive -Path '${tempZip}' -DestinationPath '${tempDir}' -Force"`, { stdio: 'inherit' });
+        try { fs.rmSync(tempZip, { force: true }); } catch {}
       } else {
-        execSync(`curl -fsSL "${zipUrl}" -o "${tempZip}" && unzip -q "${tempZip}" -d "${tempDir}"`, { stdio: 'inherit' });
+        const tarUrl = 'https://github.com/ELITEXGAMES/proxyhub/archive/refs/heads/main.tar.gz';
+        const tempTar = path.join(os.tmpdir(), 'proxyhub-latest.tar.gz');
+        execSync(`curl -fsSL "${tarUrl}" -o "${tempTar}" && tar -xzf "${tempTar}" -C "${tempDir}"`, { stdio: 'inherit' });
+        try { fs.rmSync(tempTar, { force: true }); } catch {}
       }
 
       const extractedRoot = path.join(tempDir, 'proxyhub-main');
@@ -402,10 +403,13 @@ async function cmdUpdate(args) {
           }
         }
         console.log('   ✅ Downloaded and updated all source files to latest GitHub release.');
+      } else {
+        throw new Error('Extracted directory proxyhub-main not found.');
       }
-      try { fs.rmSync(tempZip, { force: true }); fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
-    } catch (zipErr) {
-      console.warn(`   ⚠️ Standalone zip update failed: ${zipErr.message}`);
+      try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
+    } catch (dlErr) {
+      console.warn(`   ⚠️ Archive update failed (${dlErr.message}). Trying npm install -g fallback...`);
+      execSync('npm install -g git+https://github.com/ELITEXGAMES/proxyhub.git', { stdio: 'inherit' });
     }
   }
 

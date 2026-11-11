@@ -246,48 +246,101 @@ export function isNvidiaModel(model) {
 }
 
 export function formatMessagesForOpenAI(messages = []) {
-  return messages.map(m => {
+  const out = [];
+  for (const m of messages) {
+    if (!m) continue;
+    let role = m.role === 'model' ? 'assistant' : (m.role === 'developer' ? 'system' : m.role);
     let content = m.content;
+    const extra = {};
+
     if (Array.isArray(content)) {
-      content = content.map(part => {
-        if (!part) return '';
-        if (typeof part === 'string') return part;
-        if (part.type === 'text') return part.text || '';
-        if (part.type === 'image_url') return part;
-        return typeof part === 'object' ? JSON.stringify(part) : String(part);
-      });
-      if (content.every(c => typeof c === 'string')) {
-        content = content.join('\n');
+      const toolUses = content.filter(p => p?.type === 'tool_use');
+      const toolResults = content.filter(p => p?.type === 'tool_result');
+      if (toolUses.length > 0 && role === 'assistant') {
+        extra.tool_calls = toolUses.map(tu => ({
+          id: tu.id || `call_${crypto.randomUUID().slice(0, 8)}`,
+          type: 'function',
+          function: {
+            name: tu.name || 'tool',
+            arguments: typeof tu.input === 'string' ? tu.input : JSON.stringify(tu.input || {}),
+          },
+        }));
+        const textParts = content.filter(p => p?.type === 'text').map(p => p.text || '').join('\n');
+        content = textParts || null;
+      } else if (toolResults.length > 0) {
+        for (const tr of toolResults) {
+          out.push({
+            role: 'tool',
+            tool_call_id: tr.tool_use_id || 'call_unknown',
+            content: typeof tr.content === 'string' ? tr.content : JSON.stringify(tr.content || ''),
+          });
+        }
+        const textParts = content.filter(p => p?.type === 'text').map(p => p.text || '').join('\n');
+        if (!textParts) continue;
+        content = textParts;
+      } else {
+        content = content
+          .filter(part => part && part.type !== 'thinking' && part.type !== 'redacted_thinking')
+          .map(part => {
+            if (typeof part === 'string') return part;
+            if (part.type === 'text') return part.text || '';
+            if (part.type === 'image_url') return part;
+            return typeof part === 'object' ? JSON.stringify(part) : String(part);
+          });
+        if (content.every(c => typeof c === 'string')) {
+          content = content.join('\n');
+        }
       }
     }
-    return {
-      role: m.role === 'model' ? 'assistant' : m.role,
-      content,
-    };
-  });
+
+    if (m.tool_calls && Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+      extra.tool_calls = m.tool_calls;
+    }
+    if (m.tool_call_id) extra.tool_call_id = m.tool_call_id;
+    if (m.name) extra.name = m.name;
+
+    out.push({
+      role,
+      content: content === undefined ? '' : content,
+      ...extra,
+    });
+  }
+  return out;
 }
 
 export async function callNvidiaChatCompletion({ body, model, apiKey }) {
   const formattedMessages = formatMessagesForOpenAI(body.messages || []);
   const nimModel = model.replace(/^nim:/, '');
+  const reqMaxTok = typeof body.max_tokens === 'number' && body.max_tokens > 0
+    ? body.max_tokens
+    : (typeof body.max_completion_tokens === 'number' && body.max_completion_tokens > 0 ? body.max_completion_tokens : 4096);
   const reqPayload = {
     model: nimModel,
     messages: formattedMessages,
-    temperature: body.temperature !== undefined ? body.temperature : 0.7,
-    max_tokens: body.max_tokens !== undefined ? Math.min(body.max_tokens, 4096) : 1024,
-    top_p: body.top_p !== undefined ? body.top_p : 1,
+    temperature: typeof body.temperature === 'number' ? body.temperature : 0.7,
+    max_tokens: Math.min(reqMaxTok, 16384),
+    top_p: typeof body.top_p === 'number' ? body.top_p : 1,
     stream: false,
+    ...(Array.isArray(body.tools) && body.tools.length > 0 && body.tool_choice !== 'none' ? { tools: body.tools } : {}),
   };
 
-  const response = await fetch(NVIDIA_NIM_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify(reqPayload),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
+  let response;
+  try {
+    response = await fetch(NVIDIA_NIM_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(reqPayload),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const errText = await response.text();
@@ -514,9 +567,12 @@ function parseParts(content, isRecent = true) {
   for (const item of content) {
     if (!item) continue;
     if (typeof item === 'string') {
-      parts.push({ text: item });
+      if (item) parts.push({ text: item });
+    } else if (item.type === 'tool_use' || item.type === 'tool_result' || item.type === 'thinking' || item.type === 'redacted_thinking') {
+      // Handled separately by convertMessages; never stringify raw structured blocks into text
+      continue;
     } else if (item.type === 'text') {
-      parts.push({ text: item.text || '' });
+      if (item.text) parts.push({ text: item.text });
     } else if ((item.type === 'image' || item.type === 'video' || item.type === 'audio') && item.source?.data) {
       // Anthropic media format
       if (isRecent) {
@@ -565,29 +621,71 @@ function parseParts(content, isRecent = true) {
     }
   }
 
-  return parts.length > 0 ? parts : [{ text: '' }];
+  return parts;
 }
 
-export function cleanSchemaForGemini(schema, isRoot = true) {
-  if (!schema || typeof schema !== 'object') return { type: 'object', properties: {} };
+const GEMINI_ALLOWED_FORMATS = {
+  string: new Set(['enum', 'date-time']),
+  number: new Set(['float', 'double']),
+  integer: new Set(['int32', 'int64']),
+};
 
-  if (Array.isArray(schema)) {
-    return cleanSchemaForGemini(schema[0], isRoot);
+export function cleanSchemaForGemini(schema, isRoot = true, rootDefs = null, depth = 0) {
+  if (!schema || typeof schema !== 'object' || depth > 10) {
+    return isRoot ? { type: 'object', properties: {} } : { type: 'string' };
   }
 
-  // Handle anyOf / oneOf / allOf
-  if (schema.anyOf || schema.oneOf || schema.allOf) {
-    const list = schema.anyOf || schema.oneOf || schema.allOf;
+  const defs = rootDefs || schema.$defs || schema.definitions || null;
+
+  if (Array.isArray(schema)) {
+    return cleanSchemaForGemini(schema[0], isRoot, defs, depth + 1);
+  }
+
+  // Dereference local JSON Schema $ref (#/$defs/Foo or #/definitions/Foo)
+  if (typeof schema.$ref === 'string' && defs) {
+    const refName = schema.$ref.replace(/^#\/(\$defs|definitions)\//, '');
+    if (defs[refName] && typeof defs[refName] === 'object') {
+      const { $ref, ...rest } = schema;
+      return cleanSchemaForGemini({ ...defs[refName], ...rest }, isRoot, defs, depth + 1);
+    }
+  }
+
+  // Merge allOf if present
+  if (Array.isArray(schema.allOf) && schema.allOf.length > 0) {
+    const combined = { ...schema };
+    delete combined.allOf;
+    combined.properties = { ...(schema.properties || {}) };
+    const reqSet = new Set(Array.isArray(schema.required) ? schema.required : []);
+    for (const sub of schema.allOf) {
+      if (!sub || typeof sub !== 'object') continue;
+      const resolvedSub = (typeof sub.$ref === 'string' && defs)
+        ? defs[sub.$ref.replace(/^#\/(\$defs|definitions)\//, '')] || sub
+        : sub;
+      if (resolvedSub.properties && typeof resolvedSub.properties === 'object') {
+        Object.assign(combined.properties, resolvedSub.properties);
+      }
+      if (Array.isArray(resolvedSub.required)) {
+        for (const r of resolvedSub.required) reqSet.add(r);
+      }
+      if (!combined.type && resolvedSub.type) combined.type = resolvedSub.type;
+      if (!combined.description && resolvedSub.description) combined.description = resolvedSub.description;
+    }
+    if (reqSet.size > 0) combined.required = [...reqSet];
+    return cleanSchemaForGemini(combined, isRoot, defs, depth + 1);
+  }
+
+  // Handle anyOf / oneOf
+  if (schema.anyOf || schema.oneOf) {
+    const list = schema.anyOf || schema.oneOf;
     const nonNull = Array.isArray(list) ? list.find(s => s && s.type !== 'null') : null;
     if (nonNull && typeof nonNull === 'object') {
       const merged = { ...schema, ...nonNull };
       delete merged.anyOf;
       delete merged.oneOf;
-      delete merged.allOf;
       if (Array.isArray(list) && list.some(s => s && s.type === 'null')) {
         merged.nullable = true;
       }
-      return cleanSchemaForGemini(merged, isRoot);
+      return cleanSchemaForGemini(merged, isRoot, defs, depth + 1);
     }
   }
 
@@ -603,55 +701,62 @@ export function cleanSchemaForGemini(schema, isRoot = true) {
       cleaned.type = schema.type.toLowerCase();
     }
   } else if (schema.const !== undefined) {
-    cleaned.type = typeof schema.const;
+    cleaned.type = typeof schema.const === 'boolean' ? 'boolean' : (typeof schema.const === 'number' ? 'number' : 'string');
   } else if (schema.properties) {
     cleaned.type = 'object';
   } else if (schema.items) {
     cleaned.type = 'array';
   } else {
-    cleaned.type = 'object';
+    cleaned.type = isRoot ? 'object' : 'string';
   }
 
-  // 2. format
-  if (typeof schema.format === 'string') {
-    cleaned.format = schema.format;
+  const validTypes = ['string', 'number', 'integer', 'boolean', 'array', 'object'];
+  if (!validTypes.includes(cleaned.type)) {
+    cleaned.type = 'string';
   }
 
-  // 3. description
+  // 2. description
   let desc = typeof schema.description === 'string' ? schema.description : '';
   if (schema.default !== undefined && !desc.includes(String(schema.default))) {
-    desc = desc ? `${desc} (default: ${schema.default})` : `Default: ${schema.default}`;
+    desc = desc ? `${desc} (default: ${typeof schema.default === 'object' ? JSON.stringify(schema.default) : schema.default})` : `Default: ${schema.default}`;
   }
   if (desc) cleaned.description = desc;
 
-  // 4. nullable
+  // 3. nullable
   if (typeof schema.nullable === 'boolean') {
     cleaned.nullable = schema.nullable;
   }
 
-  // 5. enum & const
-  if (Array.isArray(schema.enum)) {
+  // 4. enum & const (Gemini ONLY permits enum on type: 'string')
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+    cleaned.type = 'string';
     cleaned.enum = schema.enum.map(x => String(x));
   } else if (schema.const !== undefined) {
+    cleaned.type = 'string';
     cleaned.enum = [String(schema.const)];
+  }
+
+  // 5. format (strictly filter to Gemini-supported formats)
+  if (typeof schema.format === 'string' && GEMINI_ALLOWED_FORMATS[cleaned.type]?.has(schema.format)) {
+    cleaned.format = schema.format;
+  } else if (cleaned.enum && cleaned.type === 'string') {
+    cleaned.format = 'enum';
   }
 
   // 6. properties
   if (schema.properties && typeof schema.properties === 'object' && !Array.isArray(schema.properties)) {
     cleaned.properties = {};
     for (const [propK, propV] of Object.entries(schema.properties)) {
-      cleaned.properties[propK] = cleanSchemaForGemini(propV, false);
+      cleaned.properties[propK] = cleanSchemaForGemini(propV, false, defs, depth + 1);
     }
   }
 
   // Google Gemini API rule: An OBJECT type must have declared properties.
-  // If an arbitrary dict/object has no declared properties, nested objects cause HTTP 400.
   if (cleaned.type === 'object') {
     if (!cleaned.properties || Object.keys(cleaned.properties).length === 0) {
       if (isRoot) {
         cleaned.properties = {};
       } else {
-        // Convert nested open dict to string to guarantee Google Gemini acceptance
         cleaned.type = 'string';
         cleaned.description = (cleaned.description ? `${cleaned.description} ` : '') + '(JSON string or key-value map)';
         delete cleaned.properties;
@@ -659,16 +764,16 @@ export function cleanSchemaForGemini(schema, isRoot = true) {
     }
   }
 
-  // 7. required (must only reference declared properties)
-  if (Array.isArray(schema.required)) {
-    const validReq = schema.required.filter(r => typeof r === 'string' && (!cleaned.properties || cleaned.properties[r]));
+  // 7. required (only on object with matching declared properties)
+  if (cleaned.type === 'object' && cleaned.properties && Array.isArray(schema.required)) {
+    const validReq = schema.required.filter(r => typeof r === 'string' && Object.prototype.hasOwnProperty.call(cleaned.properties, r));
     if (validReq.length > 0) cleaned.required = validReq;
   }
 
   // 8. items
   if (cleaned.type === 'array') {
     if (schema.items && typeof schema.items === 'object') {
-      cleaned.items = cleanSchemaForGemini(schema.items, false);
+      cleaned.items = cleanSchemaForGemini(schema.items, false, defs, depth + 1);
     } else {
       cleaned.items = { type: 'string' };
     }
@@ -677,28 +782,61 @@ export function cleanSchemaForGemini(schema, isRoot = true) {
   return cleaned;
 }
 
-export function convertToolsToGemini(tools) {
+export function sanitizeGeminiToolName(name) {
+  if (!name || typeof name !== 'string') return 'tool_fn';
+  let clean = name.replace(/[^a-zA-Z0-9_.:-]/g, '_');
+  if (!/^[a-zA-Z_]/.test(clean)) clean = `fn_${clean}`;
+  return clean.slice(0, 64);
+}
+
+export function convertToolsToGemini(tools, toolChoice) {
+  if (toolChoice === 'none') return undefined;
   if (!tools || !Array.isArray(tools) || tools.length === 0) return undefined;
   const functionDeclarations = [];
 
   for (const t of tools) {
     if (!t) continue;
-    if (t.type === 'function' && t.function) {
-      functionDeclarations.push({
-        name: t.function.name,
-        description: t.function.description || '',
-        parameters: cleanSchemaForGemini(t.function.parameters, true),
-      });
-    } else if (t.name) {
-      functionDeclarations.push({
-        name: t.name,
-        description: t.description || '',
-        parameters: cleanSchemaForGemini(t.input_schema || t.parameters, true),
-      });
+    const rawName = (t.type === 'function' && t.function) ? t.function.name : t.name;
+    if (!rawName) continue;
+    const fnName = sanitizeGeminiToolName(rawName);
+    const fnDesc = ((t.type === 'function' && t.function) ? t.function.description : t.description) || '';
+    const rawParams = (t.type === 'function' && t.function) ? t.function.parameters : (t.input_schema || t.parameters);
+    const decl = {
+      name: fnName,
+      description: fnDesc,
+    };
+    if (rawParams && typeof rawParams === 'object') {
+      const cleanedParams = cleanSchemaForGemini(rawParams, true);
+      // Google Gemini rejects empty properties: {} on root parameters; omit parameters for zero-arg functions
+      if (cleanedParams.properties && Object.keys(cleanedParams.properties).length > 0) {
+        decl.parameters = cleanedParams;
+      }
     }
+    functionDeclarations.push(decl);
   }
 
   return functionDeclarations.length > 0 ? [{ functionDeclarations }] : undefined;
+}
+
+export function convertToolChoiceToGemini(toolChoice, hasTools) {
+  if (!hasTools || !toolChoice || toolChoice === 'auto') return undefined;
+  if (toolChoice === 'none') return { functionCallingConfig: { mode: 'NONE' } };
+  if (toolChoice === 'required' || toolChoice === 'any') {
+    return { functionCallingConfig: { mode: 'ANY' } };
+  }
+  if (typeof toolChoice === 'object') {
+    const fnName = toolChoice.function?.name || toolChoice.name;
+    if (fnName) {
+      return {
+        functionCallingConfig: {
+          mode: 'ANY',
+          allowedFunctionNames: [sanitizeGeminiToolName(fnName)],
+        }
+      };
+    }
+    if (toolChoice.type === 'any') return { functionCallingConfig: { mode: 'ANY' } };
+  }
+  return undefined;
 }
 
 export function generateEmbedding(input, dims = 768) {
@@ -720,11 +858,52 @@ export function generateEmbedding(input, dims = 768) {
   return result;
 }
 
+function normalizeToolResponseObject(raw) {
+  if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw;
+  }
+  if (Array.isArray(raw)) {
+    return { result: raw };
+  }
+  const str = typeof raw === 'string' ? raw : JSON.stringify(raw ?? '');
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    if (Array.isArray(parsed)) {
+      return { result: parsed };
+    }
+    return { output: str };
+  } catch {
+    return { output: str };
+  }
+}
+
+/**
+ * Convert contents array to pure text-only turns (used when retrying without tools after HTTP 400).
+ */
+export function stripToolsFromContents(contents = []) {
+  return enforceGeminiTurnAlternation(contents.map(turn => ({
+    role: turn.role,
+    parts: (turn.parts || []).map(p => {
+      if (p.functionCall) {
+        return { text: `[Called tool: ${p.functionCall.name}]` };
+      }
+      if (p.functionResponse) {
+        return { text: `[Tool result (${p.functionResponse.name}): ${JSON.stringify(p.functionResponse.response)}]` };
+      }
+      return p;
+    }).filter(Boolean),
+  })));
+}
+
 export function enforceGeminiTurnAlternation(rawContents) {
   if (!Array.isArray(rawContents) || rawContents.length === 0) {
     return [{ role: 'user', parts: [{ text: 'Hello' }] }];
   }
 
+  // Step 1: Normalize & split mixed functionResponse + text/media user turns
   const normalized = [];
   for (let i = 0; i < rawContents.length; i++) {
     const turn = rawContents[i];
@@ -735,7 +914,7 @@ export function enforceGeminiTurnAlternation(rawContents) {
     const hasFnResp = parts.some(p => p.functionResponse);
     const hasTextOrMedia = parts.some(p => !p.functionResponse);
 
-    if (turn.role === 'user' && hasFnResp && hasTextOrMedia) {
+    if (turn.role !== 'model' && hasFnResp && hasTextOrMedia) {
       const fnParts = parts.filter(p => p.functionResponse);
       const otherParts = parts.filter(p => !p.functionResponse);
       if (fnParts.length > 0) {
@@ -748,7 +927,7 @@ export function enforceGeminiTurnAlternation(rawContents) {
       normalized.push({
         role: turn.role === 'model' ? 'model' : 'user',
         parts,
-        _isFnResp: turn.role === 'user' && hasFnResp,
+        _isFnResp: turn.role !== 'model' && hasFnResp,
       });
     }
   }
@@ -757,14 +936,15 @@ export function enforceGeminiTurnAlternation(rawContents) {
     return [{ role: 'user', parts: [{ text: 'Hello' }] }];
   }
 
+  // Step 2: Enforce strict user -> model alternation & handle merging
   const alternated = [];
   for (let i = 0; i < normalized.length; i++) {
     const current = normalized[i];
     if (alternated.length === 0) {
       if (current.role === 'model') {
-        alternated.push({ role: 'user', parts: [{ text: 'Hello' }] });
+        alternated.push({ role: 'user', parts: [{ text: 'Hello' }], _isFnResp: false });
       }
-      alternated.push({ role: current.role, parts: current.parts, _isFnResp: current._isFnResp });
+      alternated.push({ role: current.role, parts: [...current.parts], _isFnResp: current._isFnResp });
       continue;
     }
 
@@ -776,32 +956,66 @@ export function enforceGeminiTurnAlternation(rawContents) {
         } else if (!prev._isFnResp && !current._isFnResp) {
           prev.parts.push(...current.parts);
         } else {
-          alternated.push({ role: 'model', parts: [{ text: 'Tool results received.' }] });
-          alternated.push({ role: current.role, parts: current.parts, _isFnResp: current._isFnResp });
+          alternated.push({ role: 'model', parts: [{ text: 'Tool results received.' }], _isFnResp: false });
+          alternated.push({ role: current.role, parts: [...current.parts], _isFnResp: current._isFnResp });
         }
       } else {
         prev.parts.push(...current.parts);
       }
     } else {
-      alternated.push({ role: current.role, parts: current.parts, _isFnResp: current._isFnResp });
+      alternated.push({ role: current.role, parts: [...current.parts], _isFnResp: current._isFnResp });
     }
   }
 
-  for (const c of alternated) {
-    delete c._isFnResp;
-    if (!c.parts || c.parts.length === 0) {
-      c.parts = [{ text: '' }];
+  // Step 3: Validate Gemini strict functionCall <-> functionResponse pairing
+  // Rule A: A model turn with functionCall(s) MUST be immediately followed by a user turn with matching functionResponse(s).
+  // Rule B: A user turn with functionResponse(s) MUST immediately follow a model turn with matching functionCall(s).
+  for (let i = 0; i < alternated.length; i++) {
+    const turn = alternated[i];
+    const next = alternated[i + 1];
+    const prev = i > 0 ? alternated[i - 1] : null;
+
+    if (turn.role === 'model' && turn.parts.some(p => p.functionCall)) {
+      const nextIsFnResp = next && next.role === 'user' && next._isFnResp;
+      if (!nextIsFnResp) {
+        // Interrupted or dangling functionCall: downgrade functionCall parts to readable text so Gemini never returns 400
+        turn.parts = turn.parts.map(p => p.functionCall ? { text: `[Called tool: ${p.functionCall.name}]` } : p);
+      }
+    }
+
+    if (turn.role === 'user' && turn._isFnResp) {
+      const prevHasFnCall = prev && prev.role === 'model' && prev.parts.some(p => p.functionCall);
+      if (!prevHasFnCall) {
+        // Orphaned functionResponse (e.g. history truncated): downgrade to readable text
+        turn.parts = turn.parts.map(p => p.functionResponse
+          ? { text: `[Tool result (${p.functionResponse.name}): ${JSON.stringify(p.functionResponse.response)}]` }
+          : p);
+        turn._isFnResp = false;
+      }
     }
   }
 
-  if (alternated.length === 0) {
-    alternated.push({ role: 'user', parts: [{ text: 'Hello' }] });
-  }
-  if (alternated[0].role !== 'user') {
-    alternated.unshift({ role: 'user', parts: [{ text: 'Hello' }] });
+  // Step 4: Final merge pass in case downgrading created adjacent plain user turns, and strip internal flags
+  const finalTurns = [];
+  for (const turn of alternated) {
+    delete turn._isFnResp;
+    const validParts = (turn.parts || []).filter(p => p && (p.text !== undefined || p.inlineData || p.functionCall || p.functionResponse));
+    if (validParts.length === 0) validParts.push({ text: ' ' });
+    if (finalTurns.length > 0 && finalTurns[finalTurns.length - 1].role === turn.role) {
+      finalTurns[finalTurns.length - 1].parts.push(...validParts);
+    } else {
+      finalTurns.push({ role: turn.role, parts: validParts });
+    }
   }
 
-  return alternated;
+  if (finalTurns.length === 0) {
+    finalTurns.push({ role: 'user', parts: [{ text: 'Hello' }] });
+  }
+  if (finalTurns[0].role !== 'user') {
+    finalTurns.unshift({ role: 'user', parts: [{ text: 'Hello' }] });
+  }
+
+  return finalTurns;
 }
 
 export function convertMessages(messages = [], declaredTools = []) {
@@ -827,7 +1041,7 @@ export function convertMessages(messages = [], declaredTools = []) {
         name = name || 'tool';
       }
     }
-    return name;
+    return sanitizeGeminiToolName(name);
   };
 
   for (let i = 0; i < totalMsgs; i++) {
@@ -835,7 +1049,7 @@ export function convertMessages(messages = [], declaredTools = []) {
     if (!msg) continue;
     const isRecent = i >= totalMsgs - 4;
 
-    if (msg.role === 'system') {
+    if (msg.role === 'system' || msg.role === 'developer') {
       systemParts = systemParts.concat(parseParts(msg.content, isRecent));
     } else if (msg.role === 'assistant') {
       const parts = parseParts(msg.content, isRecent);
@@ -843,7 +1057,7 @@ export function convertMessages(messages = [], declaredTools = []) {
       // Handle OpenAI tool_calls
       if (Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
         for (const tc of msg.tool_calls) {
-          const fnName = tc.function?.name || tc.name || 'tool';
+          const fnName = sanitizeGeminiToolName(tc.function?.name || tc.name || 'tool');
           const callId = tc.id || `call_${crypto.randomUUID().slice(0, 8)}`;
           toolCallMap.set(callId, fnName);
           globalToolCallMap.set(callId, fnName);
@@ -854,6 +1068,9 @@ export function convertMessages(messages = [], declaredTools = []) {
             } catch {
               parsedArgs = { raw: tc.function.arguments };
             }
+          }
+          if (!parsedArgs || typeof parsedArgs !== 'object' || Array.isArray(parsedArgs)) {
+            parsedArgs = { value: parsedArgs };
           }
           const sig = getSavedThoughtSignature(callId) || getSavedThoughtSignature(fnName) || "skip_thought_signature_validator";
           parts.push({
@@ -872,14 +1089,15 @@ export function convertMessages(messages = [], declaredTools = []) {
         for (const item of msg.content) {
           if (item?.type === 'tool_use') {
             const callId = item.id || `toolu_${crypto.randomUUID().slice(0, 8)}`;
-            const fnName = item.name || 'tool';
+            const fnName = sanitizeGeminiToolName(item.name || 'tool');
             toolCallMap.set(callId, fnName);
             globalToolCallMap.set(callId, fnName);
             const sig = getSavedThoughtSignature(callId) || getSavedThoughtSignature(fnName) || "skip_thought_signature_validator";
+            const safeInput = (item.input && typeof item.input === 'object' && !Array.isArray(item.input)) ? item.input : {};
             parts.push({
               functionCall: {
                 name: fnName,
-                args: item.input || {},
+                args: safeInput,
               },
               thoughtSignature: sig,
               thought_signature: sig,
@@ -890,43 +1108,25 @@ export function convertMessages(messages = [], declaredTools = []) {
 
       const hasFn = parts.some(p => p.functionCall);
       const cleanParts = hasFn
-        ? parts.filter(p => !p.text || (p.text !== '' && p.text !== 'null' && p.text !== '[Media Cleaned]'))
-        : (parts.length > 0 ? parts : [{ text: '' }]);
+        ? parts.filter(p => !p.text || (p.text.trim() !== '' && p.text !== 'null' && p.text !== '[Media Cleaned]'))
+        : parts;
 
-      // Merge with previous turn if it was also 'model'
+      if (cleanParts.length === 0) continue;
+
       if (contents.length > 0 && contents[contents.length - 1].role === 'model') {
         contents[contents.length - 1].parts.push(...cleanParts);
       } else {
-        contents.push({ role: 'model', parts: cleanParts.length > 0 ? cleanParts : [{ text: '' }] });
+        contents.push({ role: 'model', parts: cleanParts });
       }
     } else if (msg.role === 'tool') {
-      // OpenAI tool response turn
       const toolId = msg.tool_call_id || '';
       const fnName = resolveToolName(toolId, msg.name);
-      let responseObj;
-      if (typeof msg.content === 'object' && msg.content !== null) {
-        responseObj = msg.content;
-      } else {
-        const str = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content || '');
-        try {
-          const parsed = JSON.parse(str);
-          if (typeof parsed === 'object' && parsed !== null) {
-            responseObj = parsed;
-          } else {
-            responseObj = { output: str };
-          }
-        } catch {
-          responseObj = { output: str };
-        }
-      }
       const toolPart = {
         functionResponse: {
           name: fnName,
-          response: responseObj,
+          response: normalizeToolResponseObject(msg.content),
         }
       };
-      // CRITICAL: A functionResponse turn in Gemini must strictly contain ONLY functionResponse parts.
-      // Never mix functionResponse with regular user text in the same turn!
       if (contents.length > 0 && contents[contents.length - 1].role === 'user' && contents[contents.length - 1]._isFnResp) {
         contents[contents.length - 1].parts.push(toolPart);
       } else {
@@ -941,26 +1141,10 @@ export function convertMessages(messages = [], declaredTools = []) {
           if (item.type === 'tool_result') {
             const toolId = item.tool_use_id || '';
             const fnName = resolveToolName(toolId, item.name);
-            let responseObj;
-            if (typeof item.content === 'object' && item.content !== null) {
-              responseObj = item.content;
-            } else {
-              const str = typeof item.content === 'string' ? item.content : JSON.stringify(item.content || '');
-              try {
-                const parsed = JSON.parse(str);
-                if (typeof parsed === 'object' && parsed !== null) {
-                  responseObj = parsed;
-                } else {
-                  responseObj = { output: str };
-                }
-              } catch {
-                responseObj = { output: str };
-              }
-            }
             parts.push({
               functionResponse: {
                 name: fnName,
-                response: responseObj,
+                response: normalizeToolResponseObject(item.content),
               }
             });
           } else {
@@ -971,29 +1155,22 @@ export function convertMessages(messages = [], declaredTools = []) {
         parts.push(...parseParts(msg.content, isRecent));
       }
 
-      const cleanUserParts = parts.length > 0 ? parts : [{ text: '' }];
+      const cleanUserParts = parts.length > 0 ? parts : [{ text: ' ' }];
       const hasFnResp = cleanUserParts.some(p => p.functionResponse);
 
       if (hasFnResp) {
-        if (contents.length > 0 && contents[contents.length - 1].role === 'user' && contents[contents.length - 1]._isFnResp) {
-          contents[contents.length - 1].parts.push(...cleanUserParts);
-        } else {
-          contents.push({ role: 'user', parts: cleanUserParts, _isFnResp: true });
-        }
+        contents.push({ role: 'user', parts: cleanUserParts, _isFnResp: true });
       } else {
-        if (contents.length > 0 && contents[contents.length - 1].role === 'user' && !contents[contents.length - 1]._isFnResp) {
-          contents[contents.length - 1].parts.push(...cleanUserParts);
-        } else {
-          contents.push({ role: 'user', parts: cleanUserParts });
-        }
+        contents.push({ role: 'user', parts: cleanUserParts });
       }
     }
   }
 
   const finalContents = enforceGeminiTurnAlternation(contents);
 
-  const systemInstruction = systemParts.length > 0
-    ? { parts: systemParts }
+  const validSysParts = systemParts.filter(p => p && p.text && p.text.trim() !== '');
+  const systemInstruction = validSysParts.length > 0
+    ? { parts: validSysParts }
     : undefined;
 
   return { systemInstruction, contents: finalContents };
@@ -1165,6 +1342,217 @@ const MODEL_ALIASES = {
   'qwen-2.5-72b':            'qwen/qwen2.5-72b-instruct',
 };
 
+/**
+ * Extract safe Gemini generationConfig parameters from an OpenAI/Anthropic body.
+ * Explicitly guards against null values (which serialize to 0 or cause HTTP 400 in Gemini).
+ */
+function buildBaseGenConfig(body) {
+  const cfg = {};
+  if (typeof body.temperature === 'number' && !Number.isNaN(body.temperature)) {
+    cfg.temperature = body.temperature;
+  }
+  const maxTok = (typeof body.max_tokens === 'number' && body.max_tokens > 0)
+    ? body.max_tokens
+    : ((typeof body.max_completion_tokens === 'number' && body.max_completion_tokens > 0) ? body.max_completion_tokens : null);
+  if (maxTok !== null) {
+    cfg.maxOutputTokens = Math.min(Math.floor(maxTok), 65535);
+  }
+  if (typeof body.top_p === 'number' && !Number.isNaN(body.top_p)) {
+    cfg.topP = body.top_p;
+  }
+  if (Array.isArray(body.stop) && body.stop.length > 0) {
+    const validStops = body.stop.filter(s => typeof s === 'string' && s.length > 0).slice(0, 5);
+    if (validStops.length > 0) cfg.stopSequences = validStops;
+  } else if (typeof body.stop === 'string' && body.stop.length > 0) {
+    cfg.stopSequences = [body.stop];
+  }
+  return cfg;
+}
+
+/**
+ * Configure thinking budget conservatively so non-thinking models answer immediately
+ * without spending 15s on hidden reasoning or failing with HTTP 400.
+ */
+function applyThinkingConfig(stepGenConfig, stepModel, bodyModel, actualModel) {
+  const s = (stepModel || '').toLowerCase();
+  const b = (bodyModel || '').toLowerCase();
+  const a = (actualModel || '').toLowerCase();
+  if (s === 'gemini-web-thinking' || s.includes('thinking') || b.includes('thinking')) {
+    stepGenConfig.thinkingConfig = { thinkingBudget: 4096 };
+    return;
+  }
+  if (a === 'gemini-2.5-flash' || a === 'gemini-2.5-flash-lite') {
+    stepGenConfig.thinkingConfig = { thinkingBudget: 0 };
+  } else if (a === 'gemini-2.5-pro') {
+    // Gemini 2.5 Pro minimum thinking budget is 128; setting 0 triggers HTTP 400
+    stepGenConfig.thinkingConfig = { thinkingBudget: 128 };
+  }
+}
+
+/**
+ * Execute an upstream Gemini / Antigravity request with automatic recovery for:
+ * 401 (forced OAuth token refresh), 429 (alt-account failover), and
+ * 400 (stage 1: strip thinkingConfig; stage 2: strip tools + convert tool history to text).
+ */
+async function fetchGeminiWithRecovery({
+  acc,
+  token,
+  m,
+  actualModel,
+  contents,
+  systemInstruction,
+  stepGenConfig,
+  tools,
+  toolConfig,
+  stream,
+  isImg,
+  isVid,
+  logTag = 'proxy',
+}) {
+  const isDirectKey = token.startsWith('AIzaSy');
+  const buildReqObj = (cfg, useTools, useContents) => {
+    const innerReq = {
+      contents: useContents,
+      ...(systemInstruction && { systemInstruction }),
+      ...(Object.keys(cfg).length && { generationConfig: cfg }),
+      ...(useTools && { tools: useTools }),
+      ...(useTools && toolConfig && { toolConfig }),
+    };
+    if (isDirectKey) return innerReq;
+    return {
+      project: acc.projectId || `proxy-${crypto.randomUUID().slice(0, 8)}`,
+      model: actualModel,
+      request: innerReq,
+      requestType: 'agent',
+      userAgent: USER_AGENT,
+      requestId: `agent-${crypto.randomUUID()}`,
+    };
+  };
+
+  const getUrl = (useStream) => {
+    if (isDirectKey) {
+      const action = useStream ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
+      return `https://generativelanguage.googleapis.com/v1beta/models/${m}:${action}key=${token}`;
+    }
+    return useStream
+      ? `${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`
+      : `${ANTIGRAVITY_ENDPOINT}/v1internal:generateContent`;
+  };
+
+  const doFetch = async (bearerToken, payloadObj, timeoutMs) => {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(getUrl(stream), {
+        method: 'POST',
+        headers: {
+          ...(!isDirectKey && { Authorization: `Bearer ${bearerToken}`, 'User-Agent': USER_AGENT }),
+          'Content-Type': 'application/json',
+          ...(stream && { Accept: 'text/event-stream' }),
+        },
+        body: JSON.stringify(payloadObj),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(tid);
+    }
+  };
+
+  const timeoutMs = (isImg || isVid) ? 90000 : (stream ? 45000 : 90000);
+  let activeAcc = acc;
+  let activeToken = token;
+  let currentCfg = { ...stepGenConfig };
+  let res = await doFetch(activeToken, buildReqObj(currentCfg, tools, contents), timeoutMs);
+
+  // 401: Force OAuth token refresh
+  if (res.status === 401 && activeAcc.refreshToken && !isDirectKey) {
+    console.warn(`[${logTag}] 401 on ${activeAcc.email}. Refreshing token and retrying...`);
+    try {
+      activeToken = await ensureToken(activeAcc, true);
+      res = await doFetch(activeToken, buildReqObj(currentCfg, tools, contents), timeoutMs);
+    } catch (e) {
+      console.warn(`[${logTag}] Token refresh retry failed:`, e.message);
+    }
+  }
+
+  // 429: Immediate alt-account failover
+  if (res.status === 429 && !activeAcc.isCookie && !isDirectKey) {
+    const others = getEnabledAccounts().filter(a => a.id !== activeAcc.id && !a.isCookie);
+    for (const altAcc of others) {
+      console.warn(`[${logTag}] ${activeAcc.email} rate-limited (429). Failing over to ${altAcc.email}...`);
+      try {
+        const altToken = await ensureToken(altAcc);
+        const altBody = { ...buildReqObj(currentCfg, tools, contents), project: altAcc.projectId || `proxy-${crypto.randomUUID().slice(0, 8)}` };
+        const altRes = await doFetch(altToken, altBody, timeoutMs);
+        if (altRes.ok || altRes.status === 400) {
+          res = altRes;
+          activeAcc = altAcc;
+          activeToken = altToken;
+          break;
+        }
+      } catch (altErr) {
+        console.warn(`[${logTag}] Alt-account failover error:`, altErr.message);
+      }
+    }
+  }
+
+  // 400 Stage 1: Retry without thinkingConfig if thinkingConfig was sent
+  let lastErrText = '';
+  if (res.status === 400 && currentCfg.thinkingConfig) {
+    lastErrText = await res.text().catch(() => '');
+    console.warn(`[${logTag}] ${m} returned 400 (${lastErrText.slice(0, 120)}). Retrying without thinkingConfig...`);
+    const { thinkingConfig: _, ...cfgWithoutThink } = currentCfg;
+    currentCfg = cfgWithoutThink;
+    res = await doFetch(activeToken, buildReqObj(currentCfg, tools, contents), timeoutMs);
+  }
+
+  // 400 Stage 2: Retry without tools (and sanitize tool call/response history to text)
+  if (res.status === 400 && (tools || contents.some(c => c.parts?.some(p => p.functionCall || p.functionResponse)))) {
+    if (!lastErrText) lastErrText = await res.text().catch(() => '');
+    console.warn(`[${logTag}] ${m} returned 400 (${lastErrText.slice(0, 120)}). Retrying cleanly without tools...`);
+    const textOnlyContents = stripToolsFromContents(contents);
+    res = await doFetch(activeToken, buildReqObj(currentCfg, undefined, textOnlyContents), timeoutMs);
+  }
+
+  return { res, acc: activeAcc, token: activeToken };
+}
+
+/**
+ * Shared SSE stream line parser that handles \r\n, optional space after "data:", and final unflushed buffer.
+ */
+async function readSseStream(reader, onJsonPayload) {
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const processLine = (rawLine) => {
+    const line = rawLine.replace(/\r$/, '');
+    if (!line.startsWith('data:')) return;
+    const payload = line.slice(5).trim();
+    if (!payload || payload === '[DONE]') return;
+    try {
+      const parsed = JSON.parse(payload);
+      onJsonPayload(parsed);
+    } catch {
+      // Ignore partial/malformed keepalive frames
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) processLine(line);
+  }
+
+  // Flush decoder and process any final unterminated buffer line
+  buffer += decoder.decode();
+  if (buffer.trim()) {
+    for (const line of buffer.split('\n')) processLine(line);
+  }
+}
+
 const FALLBACK_MODELS = [
   'gemini-2.5-flash',
   'gemini-3.8-flash-tiered',
@@ -1300,6 +1688,41 @@ function resolveExecutionSteps(primaryModel) {
   }));
 }
 
+function resolveAccountForStep(step) {
+  const isGeminiWeb = step.provider === 'gemini-web' ||
+                      (step.accountId && step.accountId.startsWith('cookie:')) ||
+                      isGeminiWebModel(step.model);
+  let acc = null;
+  let cookieObj = null;
+  if (step.accountId && step.accountId.startsWith('cookie:')) {
+    cookieObj = getRawGeminiCookie(step.accountId.slice(7));
+  } else if (isGeminiWeb) {
+    cookieObj = getNextGeminiCookie();
+  }
+  if (cookieObj && cookieObj.cookie) {
+    acc = {
+      id: `cookie:${cookieObj.id}`,
+      email: `Gemini Web (${cookieObj.name})`,
+      accessToken: cookieObj.cookie,
+      projectId: 'aicode-consumers',
+      enabled: true,
+      isCookie: true,
+    };
+  } else {
+    acc = (step.accountId && !step.accountId.startsWith('cookie:') && !step.accountId.startsWith('nvidia:') ? getRawAccount(step.accountId) : null) || getNextAccount();
+  }
+  if (!acc || !acc.enabled) acc = getNextAccount();
+  return acc;
+}
+
+function mapGeminiFinishReason(rawReason, hasToolCalls) {
+  if (hasToolCalls) return 'tool_calls';
+  const r = String(rawReason || 'STOP').toUpperCase();
+  if (r === 'MAX_TOKENS') return 'length';
+  if (r === 'SAFETY' || r === 'RECITATION' || r === 'BLOCKLIST' || r === 'PROHIBITED_CONTENT') return 'content_filter';
+  return 'stop';
+}
+
 // ───── Non-streaming chat completion with Auto 429 Fallback & Combos ─────
 
 export async function chatCompletion(body) {
@@ -1307,16 +1730,14 @@ export async function chatCompletion(body) {
   const promptText = extractLastUserPrompt(body.messages || []);
   const primaryModel = resolveModel(body.model || 'auto-fallback', promptText);
   const { systemInstruction, contents } = convertMessages(body.messages || [], body.tools);
-  const tools = convertToolsToGemini(body.tools);
-
-  const baseGenConfig = {};
-  if (body.temperature !== undefined)  baseGenConfig.temperature     = body.temperature;
-  if (body.max_tokens !== undefined)   baseGenConfig.maxOutputTokens = Math.min(body.max_tokens, 65535);
-  if (body.top_p !== undefined)        baseGenConfig.topP            = body.top_p;
+  const tools = convertToolsToGemini(body.tools, body.tool_choice);
+  const toolConfig = convertToolChoiceToGemini(body.tool_choice, !!tools);
+  const baseGenConfig = buildBaseGenConfig(body);
 
   const steps = resolveExecutionSteps(primaryModel);
   let lastErr = null;
   let finalRes = null;
+  let lastThoughtFallback = '';
   let modelUsed = primaryModel;
   let accountUsed = null;
   let stepsAttempted = 1;
@@ -1348,6 +1769,14 @@ export async function chatCompletion(body) {
         const choice = nimResult.choices?.[0];
         const text = choice?.message?.content || '';
         const nimToolCalls = choice?.message?.tool_calls;
+        const reasoning = choice?.message?.reasoning_content || '';
+
+        if (!text && (!nimToolCalls || nimToolCalls.length === 0)) {
+          if (reasoning && !lastThoughtFallback) lastThoughtFallback = reasoning;
+          console.warn(`[chatCompletion] Step ${i + 1}/${steps.length} (${step.model}) NIM returned empty content. Falling back...`);
+          continue;
+        }
+
         const usage = nimResult.usage || {};
         const promptTokens = usage.prompt_tokens || 10;
         const completionTokens = usage.completion_tokens || Math.max(1, Math.round(text.length / 4));
@@ -1362,10 +1791,6 @@ export async function chatCompletion(body) {
         });
 
         const finishReason = (nimToolCalls && nimToolCalls.length > 0) ? 'tool_calls' : (choice?.finish_reason || 'stop');
-        let finalNimContent = text;
-        if (!finalNimContent && (!nimToolCalls || nimToolCalls.length === 0)) {
-          finalNimContent = choice?.message?.reasoning_content || "I have reviewed your request. How would you like me to proceed?";
-        }
 
         return {
           id: nimResult.id || `chatcmpl-${crypto.randomUUID().slice(0, 12)}`,
@@ -1376,8 +1801,8 @@ export async function chatCompletion(body) {
             index: 0,
             message: {
               role: 'assistant',
-              content: (nimToolCalls && nimToolCalls.length > 0) ? (finalNimContent || null) : finalNimContent,
-              ...(choice?.message?.reasoning_content ? { reasoning_content: choice.message.reasoning_content } : {}),
+              content: (nimToolCalls && nimToolCalls.length > 0) ? (text || null) : text,
+              ...(reasoning ? { reasoning_content: reasoning } : {}),
               ...(nimToolCalls && nimToolCalls.length > 0 ? { tool_calls: nimToolCalls } : {}),
             },
             finish_reason: finishReason,
@@ -1402,31 +1827,7 @@ export async function chatCompletion(body) {
       }
     }
 
-    const isGeminiWeb = step.provider === 'gemini-web' ||
-                        (step.accountId && step.accountId.startsWith('cookie:')) ||
-                        isGeminiWebModel(step.model);
-
-    let acc = null;
-    let cookieObj = null;
-    if (step.accountId && step.accountId.startsWith('cookie:')) {
-      cookieObj = getRawGeminiCookie(step.accountId.slice(7));
-    } else if (isGeminiWeb) {
-      cookieObj = getNextGeminiCookie();
-    }
-
-    if (cookieObj && cookieObj.cookie) {
-      acc = {
-        id: `cookie:${cookieObj.id}`,
-        email: `Gemini Web (${cookieObj.name})`,
-        accessToken: cookieObj.cookie,
-        projectId: 'aicode-consumers',
-        enabled: true,
-        isCookie: true,
-      };
-    } else {
-      acc = (step.accountId && !step.accountId.startsWith('cookie:') && !step.accountId.startsWith('nvidia:') ? getRawAccount(step.accountId) : null) || getNextAccount();
-    }
-    if (!acc || !acc.enabled) acc = getNextAccount();
+    let acc = resolveAccountForStep(step);
     if (!acc) continue;
 
     try {
@@ -1438,155 +1839,77 @@ export async function chatCompletion(body) {
       const stepGenConfig = { ...baseGenConfig };
       if (isImg) stepGenConfig.responseModalities = ['IMAGE'];
       else if (isVid) stepGenConfig.responseModalities = ['VIDEO'];
-      if (step.model === 'gemini-web-thinking') {
-        stepGenConfig.thinkingConfig = { thinkingBudget: 4096 };
-      } else if (!step.model.includes('thinking') && !(body.model && body.model.includes('thinking')) && body.thinking === undefined) {
-        if (actualModel.includes('2.5-flash') || actualModel.includes('2.0-flash')) {
-          stepGenConfig.thinkingConfig = { thinkingBudget: 0 };
-        }
-      }
+      applyThinkingConfig(stepGenConfig, step.model, body.model, actualModel);
 
-      const requestBody = {
-        project: acc.projectId || `proxy-${crypto.randomUUID().slice(0, 8)}`,
-        model: actualModel,
-        request: {
-          contents,
-          ...(systemInstruction && { systemInstruction }),
-          ...(Object.keys(stepGenConfig).length && { generationConfig: stepGenConfig }),
-          ...(tools && { tools }),
-        },
-        requestType: 'agent',
-        userAgent: USER_AGENT,
-        requestId: `agent-${crypto.randomUUID()}`,
-      };
-
-      const controller = new AbortController();
-      const timeoutHandle = setTimeout(() => controller.abort(), 90000);
-      let res;
-      try {
-        if (token.startsWith('AIzaSy')) {
-          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${token}`;
-          res = await fetch(directUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents,
-              ...(systemInstruction && { systemInstruction }),
-              ...(Object.keys(stepGenConfig).length && { generationConfig: stepGenConfig }),
-              ...(tools && { tools }),
-            }),
-            signal: controller.signal,
-          });
-        } else {
-          res = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:generateContent`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'User-Agent': USER_AGENT,
-            },
-            body: JSON.stringify(requestBody),
-            signal: controller.signal,
-          });
-        }
-      } finally {
-        clearTimeout(timeoutHandle);
-      }
-
-      // 401 Unauthorized: automatically force refresh OAuth token and retry immediately
-      if (res.status === 401 && acc.refreshToken) {
-        console.warn(`[chatCompletion] 401 Unauthorized on ${acc.email}. Forcing token refresh and retrying once...`);
-        try {
-          const freshToken = await ensureToken(acc, true);
-          const retryRes = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:generateContent`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${freshToken}`,
-              'Content-Type': 'application/json',
-              'User-Agent': USER_AGENT,
-            },
-            body: JSON.stringify(requestBody),
-          });
-          if (retryRes.ok) res = retryRes;
-        } catch (retryErr) {
-          console.warn(`[chatCompletion] Token refresh retry failed on ${acc.email}:`, retryErr.message);
-        }
-      }
-
-      // 429 Rate Limit: immediately attempt same model on alternate enabled account if available
-      if (res.status === 429 && !acc.isCookie) {
-        const otherAccounts = getEnabledAccounts().filter(a => a.id !== acc.id && !a.isCookie);
-        if (otherAccounts.length > 0) {
-          console.warn(`[chatCompletion] ${acc.email} rate-limited (429). Instantly attempting on alternate account ${otherAccounts[0].email}...`);
-          try {
-            const altAcc = otherAccounts[0];
-            const altToken = await ensureToken(altAcc);
-            const altBody = { ...requestBody, project: altAcc.projectId || requestBody.project };
-            const altRes = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:generateContent`, {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${altToken}`,
-                'Content-Type': 'application/json',
-                'User-Agent': USER_AGENT,
-              },
-              body: JSON.stringify(altBody),
-            });
-            if (altRes.ok) {
-              res = altRes;
-              acc = altAcc;
-            }
-          } catch (altErr) {
-            console.warn(`[chatCompletion] Alt-account failover failed:`, altErr.message);
-          }
-        }
-      }
+      let { res, acc: activeAcc, token: activeToken } = await fetchGeminiWithRecovery({
+        acc,
+        token,
+        m,
+        actualModel,
+        contents,
+        systemInstruction,
+        stepGenConfig,
+        tools,
+        toolConfig,
+        stream: false,
+        isImg,
+        isVid,
+        logTag: 'chatCompletion',
+      });
+      acc = activeAcc;
 
       if (res.ok) {
-        finalRes = await res.json();
-        modelUsed = m;
-        accountUsed = acc;
-        break;
-      }
+        let candidateJson = await res.json();
+        let inner = candidateJson.response || candidateJson;
+        let cand = inner.candidates?.[0];
+        let parts = cand?.content?.parts || [];
+        let hasUsable = parts.some(p => (p.text && !p.thought) || p.functionCall || p.inlineData?.data);
 
-      const errText = await res.text();
-
-      // If upstream returned 400 Bad Request and tools were passed, retry once without tools
-      if (res.status === 400 && tools && tools.length > 0) {
-        console.warn(`[chatCompletion] Step ${i + 1}/${steps.length} (${m}) returned 400 Bad Request: ${errText.slice(0, 150)}. Retrying step without tools...`);
-        try {
-          const strippedReqBody = {
-            ...requestBody,
-            request: {
-              contents,
-              ...(systemInstruction && { systemInstruction }),
-              ...(Object.keys(stepGenConfig).length && { generationConfig: stepGenConfig }),
-            }
-          };
-          const retryRes = await fetch(
-            token.startsWith('AIzaSy')
-              ? `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${token}`
-              : `${ANTIGRAVITY_ENDPOINT}/v1internal:generateContent`,
-            {
-              method: 'POST',
-              headers: token.startsWith('AIzaSy')
-                ? { 'Content-Type': 'application/json' }
-                : { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'User-Agent': USER_AGENT },
-              body: JSON.stringify(token.startsWith('AIzaSy') ? strippedReqBody.request : strippedReqBody),
-            }
-          );
-          if (retryRes.ok) {
-            finalRes = await retryRes.json();
-            modelUsed = m;
-            accountUsed = acc;
-            break;
+        // If Gemini returned HTTP 200 but MALFORMED_FUNCTION_CALL / empty usable parts, retry once without tools
+        if (!hasUsable && tools && !cand?.finishReason?.includes('SAFETY')) {
+          const reason = cand?.finishReason || 'empty parts';
+          console.warn(`[chatCompletion] Step ${i + 1} (${m}) produced no usable output (${reason}). Retrying without tools...`);
+          const { thinkingConfig: _, ...cfgNoThink } = stepGenConfig;
+          const retry = await fetchGeminiWithRecovery({
+            acc,
+            token: activeToken,
+            m,
+            actualModel,
+            contents: stripToolsFromContents(contents),
+            systemInstruction,
+            stepGenConfig: cfgNoThink,
+            tools: undefined,
+            toolConfig: undefined,
+            stream: false,
+            isImg,
+            isVid,
+            logTag: 'chatCompletion-retry',
+          });
+          if (retry.res.ok) {
+            candidateJson = await retry.res.json();
+            inner = candidateJson.response || candidateJson;
+            cand = inner.candidates?.[0];
+            parts = cand?.content?.parts || [];
+            hasUsable = parts.some(p => (p.text && !p.thought) || p.functionCall || p.inlineData?.data);
           }
-        } catch (retryE) {
-          console.warn(`[chatCompletion] Stripped-tool retry failed:`, retryE.message);
         }
+
+        if (hasUsable) {
+          finalRes = candidateJson;
+          modelUsed = m;
+          accountUsed = acc;
+          break;
+        }
+
+        const thoughtsOnly = parts.filter(p => p.thought && p.text).map(p => p.text).join('');
+        if (thoughtsOnly && !lastThoughtFallback) lastThoughtFallback = thoughtsOnly;
+        console.warn(`[chatCompletion] Step ${i + 1}/${steps.length} (${m}) had no usable output (finishReason=${cand?.finishReason}). Falling back...`);
+        continue;
       }
 
+      const errText = await res.text().catch(() => '');
       lastErr = new Error(`Antigravity API error (${res.status}): ${errText}`);
-      console.warn(`[chatCompletion] Step ${i + 1}/${steps.length} (${m} on ${acc.email}) returned ${res.status}: ${errText.slice(0, 150)}. Falling back to next step with full context preserved...`);
+      console.warn(`[chatCompletion] Step ${i + 1}/${steps.length} (${m} on ${acc.email}) returned ${res.status}: ${errText.slice(0, 150)}. Falling back to next step...`);
       await new Promise(r => setTimeout(r, 200));
       continue;
     } catch (e) {
@@ -1600,9 +1923,8 @@ export async function chatCompletion(body) {
   }
 
   if (!finalRes) {
-    // If all models failed, provide clean friendly response instead of crashing with 500
-    let fallbackText = "⚠️ Antigravity Proxy Notice: Upstream models are temporarily busy or rate-limited. Please try again shortly, or check your quotas at http://localhost:4000.";
-    if (promptText && /\b(image|draw|picture|photo)\b/i.test(promptText)) {
+    let fallbackText = lastThoughtFallback || "⚠️ Antigravity Proxy Notice: Upstream models are temporarily busy or rate-limited. Please try again shortly, or check your quotas at http://localhost:4000.";
+    if (!lastThoughtFallback && promptText && /\b(image|draw|picture|photo)\b/i.test(promptText)) {
       fallbackText = "⚠️ Google Antigravity Image Generation Quota has been reached for the current period (Google limits image calls per account). Your quota will reset shortly. Tip: Add a 2nd Google account in the dashboard (+ Add Account) for immediate fresh quota!";
     }
     return {
@@ -1615,7 +1937,7 @@ export async function chatCompletion(body) {
         message: { role: 'assistant', content: fallbackText },
         finish_reason: 'stop',
       }],
-      usage: { prompt_tokens: 10, completionTokens: 20, total_tokens: 30 },
+      usage: { prompt_tokens: 10, completion_tokens: Math.max(1, Math.round(fallbackText.length / 4)), total_tokens: 30 },
       _proxyMeta: { modelUsed, accountEmail: accountUsed?.email || 'default', stepsAttempted, totalSteps: steps.length },
     };
   }
@@ -1631,7 +1953,7 @@ export async function chatCompletion(body) {
   for (const p of parts) {
     if (p.thought) {
       if (p.text) thoughtParts.push(p.text);
-    } else if (p.functionCall) {
+    } else if (p.functionCall && p.functionCall.name) {
       functionCalls.push({
         ...p.functionCall,
         thoughtSignature: p.thoughtSignature || p.thought_signature,
@@ -1673,7 +1995,7 @@ export async function chatCompletion(body) {
     };
   });
 
-  const finishReason = toolCalls.length > 0 ? 'tool_calls' : ((candidate?.finishReason || 'STOP').toLowerCase() === 'stop' ? 'stop' : (candidate?.finishReason || 'stop').toLowerCase());
+  const finishReason = mapGeminiFinishReason(candidate?.finishReason, toolCalls.length > 0);
 
   const usage = inner.usageMetadata || {};
   const promptTokens = usage.promptTokenCount || 0;
@@ -1729,12 +2051,9 @@ export async function chatCompletionStream(body, res) {
   const promptText = extractLastUserPrompt(body.messages || []);
   const primaryModel = resolveModel(body.model || 'auto-fallback', promptText);
   const { systemInstruction, contents } = convertMessages(body.messages || [], body.tools);
-  const tools = convertToolsToGemini(body.tools);
-
-  const baseGenConfig = {};
-  if (body.temperature !== undefined)  baseGenConfig.temperature     = body.temperature;
-  if (body.max_tokens !== undefined)   baseGenConfig.maxOutputTokens = Math.min(body.max_tokens, 65535);
-  if (body.top_p !== undefined)        baseGenConfig.topP            = body.top_p;
+  const tools = convertToolsToGemini(body.tools, body.tool_choice);
+  const toolConfig = convertToolChoiceToGemini(body.tool_choice, !!tools);
+  const baseGenConfig = buildBaseGenConfig(body);
 
   const completionId = `chatcmpl-${crypto.randomUUID().slice(0, 12)}`;
 
@@ -1750,11 +2069,151 @@ export async function chatCompletionStream(body, res) {
     clientClosed = true;
   });
 
+  const emitChunk = (delta, finishReason = null) => {
+    if (clientClosed) return;
+    res.write(`data: ${JSON.stringify({
+      id: completionId,
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      model: body.model || modelUsed,
+      choices: [{ index: 0, delta, finish_reason: finishReason }],
+    })}\n\n`);
+  };
+
   const steps = resolveExecutionSteps(primaryModel);
-  let upstream = null;
-  let upstreamIsNvidia = false;
   let modelUsed = primaryModel;
   let accountUsed = null;
+  let streamTotalText = '';
+  let lastThoughtFallback = '';
+  let streamErrorMsg = null;
+  let toolIndex = 0;
+  let hadToolCalls = false;
+  let lastFinishReason = 'STOP';
+  let usagePromptTokens = 10;
+  let usageCompTokens = 0;
+
+  // Send initial assistant role chunk (OpenAI SSE spec for Hermes, OpenClaw, and agent frameworks)
+  emitChunk({ role: 'assistant', content: '' });
+
+  const consumeUpstreamStream = async (upstream, isNvidiaStream) => {
+    let stepText = '';
+    let stepReasoning = '';
+    let stepHadTools = false;
+    let stepErr = null;
+    let stepFinish = 'STOP';
+
+    await readSseStream(upstream.body.getReader(), (parsed) => {
+      if (parsed.error) {
+        console.warn('[chatCompletionStream] Upstream error chunk:', parsed.error);
+        stepErr = parsed.error.message || parsed.error.status || 'Upstream error';
+        return;
+      }
+
+      if (isNvidiaStream) {
+        if (parsed.usage) {
+          usagePromptTokens = parsed.usage.prompt_tokens || usagePromptTokens;
+          usageCompTokens = parsed.usage.completion_tokens || usageCompTokens;
+        }
+        const delta = parsed.choices?.[0]?.delta || {};
+        const fin = parsed.choices?.[0]?.finish_reason;
+        if (fin) stepFinish = fin;
+
+        if (delta.reasoning_content) {
+          stepReasoning += delta.reasoning_content;
+          emitChunk({ reasoning_content: delta.reasoning_content });
+        }
+        if (delta.content) {
+          stepText += delta.content;
+          streamTotalText += delta.content;
+          emitChunk({ content: delta.content });
+        }
+        if (delta.tool_calls && delta.tool_calls.length > 0) {
+          stepHadTools = true;
+          hadToolCalls = true;
+          emitChunk({ tool_calls: delta.tool_calls });
+        }
+        return;
+      }
+
+      const inner = parsed.response || parsed;
+      if (inner.error) {
+        console.warn('[chatCompletionStream] Upstream inner error:', inner.error);
+        stepErr = inner.error.message || inner.error.status || 'Model error';
+        return;
+      }
+      if (inner.usageMetadata) {
+        usagePromptTokens = inner.usageMetadata.promptTokenCount || usagePromptTokens;
+        usageCompTokens = inner.usageMetadata.candidatesTokenCount || usageCompTokens;
+      }
+      const candidate = inner.candidates?.[0];
+      if (candidate?.finishReason) {
+        stepFinish = candidate.finishReason;
+        if (candidate.finishReason === 'SAFETY') {
+          stepErr = 'Response was filtered due to safety policies.';
+        }
+      }
+      const parts = candidate?.content?.parts || [];
+
+      for (const p of parts) {
+        if (p.thought) {
+          if (p.text) {
+            stepReasoning += p.text;
+            emitChunk({ reasoning_content: p.text });
+          }
+        } else if (p.functionCall && p.functionCall.name) {
+          stepHadTools = true;
+          hadToolCalls = true;
+          const toolCallId = `call_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+          const sig = p.thoughtSignature || p.thought_signature;
+          if (sig) {
+            saveThoughtSignature(toolCallId, sig);
+            saveThoughtSignature(p.functionCall.name, sig);
+          }
+          globalToolCallMap.set(toolCallId, p.functionCall.name);
+          const idx = toolIndex++;
+          emitChunk({
+            tool_calls: [{
+              index: idx,
+              id: toolCallId,
+              type: 'function',
+              function: {
+                name: p.functionCall.name,
+                arguments: typeof p.functionCall.args === 'string' ? p.functionCall.args : JSON.stringify(p.functionCall.args || {}),
+              },
+            }],
+          });
+        } else if (p.inlineData && p.inlineData.data) {
+          const isVidPart = isVideoModel(modelUsed) || isVideoModel(body.model);
+          const mime = p.inlineData.mimeType || (isVidPart ? 'video/mp4' : 'image/png');
+          const saved = saveBase64Media(mime, p.inlineData.data);
+          if (saved) {
+            const mediaHost = body._reqHost || 'http://localhost:4000';
+            const fullUrl = `${mediaHost}${saved.url}`;
+            const mediaMarkdown = (saved.isVideo || isVidPart)
+              ? `\n\n🎥 **Generated Video:**\n[▶️ Watch Video](${fullUrl})\n\n<video controls src="${fullUrl}" width="100%"></video>\n\n`
+              : `\n\n🖼️ **Generated Image:**\n![Generated Image](${fullUrl})\n\n[📥 Download Image](${fullUrl})\n\n`;
+            stepText += mediaMarkdown;
+            streamTotalText += mediaMarkdown;
+            emitChunk({ content: mediaMarkdown });
+          }
+        } else if (p.text) {
+          const text = cleanBase64InText(p.text);
+          if (text) {
+            stepText += text;
+            streamTotalText += text;
+            emitChunk({ content: text });
+          }
+        }
+      }
+    });
+
+    if (stepReasoning && !lastThoughtFallback) lastThoughtFallback = stepReasoning;
+    if (stepErr) streamErrorMsg = stepErr;
+    lastFinishReason = stepFinish;
+    return stepText.length > 0 || stepHadTools;
+  };
+
+  let succeeded = false;
 
   for (let i = 0; i < steps.length; i++) {
     if (clientClosed) break;
@@ -1773,6 +2232,9 @@ export async function chatCompletionStream(body, res) {
         }
 
         const formattedMessages = formatMessagesForOpenAI(body.messages || []);
+        const nimMaxTok = (typeof body.max_tokens === 'number' && body.max_tokens > 0)
+          ? Math.min(body.max_tokens, 16384)
+          : ((typeof body.max_completion_tokens === 'number' && body.max_completion_tokens > 0) ? Math.min(body.max_completion_tokens, 16384) : 4096);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 45000);
         let attempt;
@@ -1787,11 +2249,11 @@ export async function chatCompletionStream(body, res) {
             body: JSON.stringify({
               model: step.model.replace(/^nim:/, ''),
               messages: formattedMessages,
-              temperature: body.temperature !== undefined ? body.temperature : 0.7,
-              max_tokens: body.max_tokens !== undefined ? Math.min(body.max_tokens, 4096) : 1024,
-              top_p: body.top_p !== undefined ? body.top_p : 1,
+              temperature: typeof body.temperature === 'number' ? body.temperature : 0.7,
+              max_tokens: nimMaxTok,
+              top_p: typeof body.top_p === 'number' ? body.top_p : 1,
               stream: true,
-              ...(body.tools ? { tools: body.tools } : {}),
+              ...(Array.isArray(body.tools) && body.tools.length > 0 && body.tool_choice !== 'none' ? { tools: body.tools } : {}),
             }),
             signal: controller.signal,
           });
@@ -1800,14 +2262,17 @@ export async function chatCompletionStream(body, res) {
         }
 
         if (attempt.ok) {
-          upstream = attempt;
-          upstreamIsNvidia = true;
           modelUsed = step.model;
           accountUsed = { email: `NIM (${nimKeyObj.name})` };
-          break;
+          if (await consumeUpstreamStream(attempt, true)) {
+            succeeded = true;
+            break;
+          }
+          console.warn(`[chatCompletionStream] Step ${i + 1} (${step.model}) NIM stream produced empty usable output. Falling back...`);
+          continue;
         }
 
-        const errText = await attempt.text();
+        const errText = await attempt.text().catch(() => '');
         console.warn(`[chatCompletionStream] Step ${i + 1}/${steps.length} (${step.model}) NVIDIA NIM returned ${attempt.status}: ${errText.slice(0, 150)}. Falling back...`);
         await new Promise(r => setTimeout(r, 200));
         continue;
@@ -1818,31 +2283,7 @@ export async function chatCompletionStream(body, res) {
       }
     }
 
-    const isGeminiWeb = step.provider === 'gemini-web' ||
-                        (step.accountId && step.accountId.startsWith('cookie:')) ||
-                        isGeminiWebModel(step.model);
-
-    let acc = null;
-    let cookieObj = null;
-    if (step.accountId && step.accountId.startsWith('cookie:')) {
-      cookieObj = getRawGeminiCookie(step.accountId.slice(7));
-    } else if (isGeminiWeb) {
-      cookieObj = getNextGeminiCookie();
-    }
-
-    if (cookieObj && cookieObj.cookie) {
-      acc = {
-        id: `cookie:${cookieObj.id}`,
-        email: `Gemini Web (${cookieObj.name})`,
-        accessToken: cookieObj.cookie,
-        projectId: 'aicode-consumers',
-        enabled: true,
-        isCookie: true,
-      };
-    } else {
-      acc = (step.accountId && !step.accountId.startsWith('cookie:') && !step.accountId.startsWith('nvidia:') ? getRawAccount(step.accountId) : null) || getNextAccount();
-    }
-    if (!acc || !acc.enabled) acc = getNextAccount();
+    let acc = resolveAccountForStep(step);
     if (!acc) continue;
 
     try {
@@ -1854,402 +2295,117 @@ export async function chatCompletionStream(body, res) {
       const stepGenConfig = { ...baseGenConfig };
       if (isImg) stepGenConfig.responseModalities = ['IMAGE'];
       else if (isVid) stepGenConfig.responseModalities = ['VIDEO'];
-      if (step.model === 'gemini-web-thinking') {
-        stepGenConfig.thinkingConfig = { thinkingBudget: 4096 };
-      } else if (!step.model.includes('thinking') && !(body.model && body.model.includes('thinking')) && body.thinking === undefined) {
-        if (actualModel.includes('2.5-flash') || actualModel.includes('2.0-flash')) {
-          stepGenConfig.thinkingConfig = { thinkingBudget: 0 };
-        }
-      }
+      applyThinkingConfig(stepGenConfig, step.model, body.model, actualModel);
 
-      const requestBody = {
-        project: acc.projectId || `proxy-${crypto.randomUUID().slice(0, 8)}`,
-        model: actualModel,
-        request: {
-          contents,
-          ...(systemInstruction && { systemInstruction }),
-          ...(Object.keys(stepGenConfig).length && { generationConfig: stepGenConfig }),
-          ...(tools && { tools }),
-        },
-        requestType: 'agent',
-        userAgent: USER_AGENT,
-        requestId: `agent-${crypto.randomUUID()}`,
-      };
-
-      const controller = new AbortController();
-      const timeoutMs = (isImg || isVid) ? 90000 : 45000;
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      let attempt;
-      try {
-        if (token.startsWith('AIzaSy')) {
-          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse&key=${token}`;
-          attempt = await fetch(directUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'text/event-stream',
-            },
-            body: JSON.stringify({
-              contents,
-              ...(systemInstruction && { systemInstruction }),
-              ...(Object.keys(stepGenConfig).length && { generationConfig: stepGenConfig }),
-              ...(tools && { tools }),
-            }),
-            signal: controller.signal,
-          });
-        } else {
-          attempt = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'User-Agent': USER_AGENT,
-              Accept: 'text/event-stream',
-            },
-            body: JSON.stringify(requestBody),
-            signal: controller.signal,
-          });
-        }
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      // 401 Unauthorized: automatically force refresh OAuth token and retry immediately
-      if (attempt.status === 401 && acc.refreshToken) {
-        console.warn(`[chatCompletionStream] 401 Unauthorized on ${acc.email}. Forcing token refresh and retrying once...`);
-        try {
-          const freshToken = await ensureToken(acc, true);
-          const retryAttempt = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${freshToken}`,
-              'Content-Type': 'application/json',
-              'User-Agent': USER_AGENT,
-              Accept: 'text/event-stream',
-            },
-            body: JSON.stringify(requestBody),
-          });
-          if (retryAttempt.ok) attempt = retryAttempt;
-        } catch (retryErr) {
-          console.warn(`[chatCompletionStream] Token refresh retry failed on ${acc.email}:`, retryErr.message);
-        }
-      }
-
-      // 429 Rate Limit: immediately attempt same model on alternate enabled account if available
-      if (attempt.status === 429 && !acc.isCookie) {
-        const otherAccounts = getEnabledAccounts().filter(a => a.id !== acc.id && !a.isCookie);
-        if (otherAccounts.length > 0) {
-          console.warn(`[chatCompletionStream] ${acc.email} rate-limited (429). Instantly attempting on alternate account ${otherAccounts[0].email}...`);
-          try {
-            const altAcc = otherAccounts[0];
-            const altToken = await ensureToken(altAcc);
-            const altBody = { ...requestBody, project: altAcc.projectId || requestBody.project };
-            const altAttempt = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`, {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${altToken}`,
-                'Content-Type': 'application/json',
-                'User-Agent': USER_AGENT,
-                Accept: 'text/event-stream',
-              },
-              body: JSON.stringify(altBody),
-            });
-            if (altAttempt.ok) {
-              attempt = altAttempt;
-              acc = altAcc;
-            }
-          } catch (altErr) {
-            console.warn(`[chatCompletionStream] Alt-account failover failed:`, altErr.message);
-          }
-        }
-      }
+      const { res: attempt, acc: activeAcc, token: activeToken } = await fetchGeminiWithRecovery({
+        acc,
+        token,
+        m,
+        actualModel,
+        contents,
+        systemInstruction,
+        stepGenConfig,
+        tools,
+        toolConfig,
+        stream: true,
+        isImg,
+        isVid,
+        logTag: 'chatCompletionStream',
+      });
+      acc = activeAcc;
 
       if (attempt.ok) {
-        upstream = attempt;
         modelUsed = m;
         accountUsed = acc;
-        break;
-      }
+        if (await consumeUpstreamStream(attempt, false)) {
+          succeeded = true;
+          break;
+        }
 
-      const errText = await attempt.text();
-
-      // If upstream returned 400 Bad Request and tools were passed, retry once without tools
-      if (attempt.status === 400 && tools && tools.length > 0) {
-        console.warn(`[chatCompletionStream] Step ${i + 1}/${steps.length} (${m}) returned 400 Bad Request: ${errText.slice(0, 150)}. Retrying step without tools...`);
-        try {
-          const strippedReqBody = {
-            ...requestBody,
-            request: {
-              contents,
-              ...(systemInstruction && { systemInstruction }),
-              ...(Object.keys(stepGenConfig).length && { generationConfig: stepGenConfig }),
-            }
-          };
-          const retryAttempt = await fetch(
-            token.startsWith('AIzaSy')
-              ? `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse&key=${token}`
-              : `${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`,
-            {
-              method: 'POST',
-              headers: token.startsWith('AIzaSy')
-                ? { 'Content-Type': 'application/json', Accept: 'text/event-stream' }
-                : { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'User-Agent': USER_AGENT, Accept: 'text/event-stream' },
-              body: JSON.stringify(token.startsWith('AIzaSy') ? strippedReqBody.request : strippedReqBody),
-            }
-          );
-          if (retryAttempt.ok) {
-            upstream = retryAttempt;
-            modelUsed = m;
-            accountUsed = acc;
+        // Empty / MALFORMED_FUNCTION_CALL stream on HTTP 200: retry once cleanly without tools before moving to next step
+        if (tools && !clientClosed) {
+          console.warn(`[chatCompletionStream] Step ${i + 1} (${m}) yielded empty/malformed stream (finishReason=${lastFinishReason}). Retrying cleanly without tools...`);
+          const { thinkingConfig: _, ...cfgNoThink } = stepGenConfig;
+          const retry = await fetchGeminiWithRecovery({
+            acc,
+            token: activeToken,
+            m,
+            actualModel,
+            contents: stripToolsFromContents(contents),
+            systemInstruction,
+            stepGenConfig: cfgNoThink,
+            tools: undefined,
+            toolConfig: undefined,
+            stream: true,
+            isImg,
+            isVid,
+            logTag: 'chatCompletionStream-retry',
+          });
+          if (retry.res.ok && await consumeUpstreamStream(retry.res, false)) {
+            succeeded = true;
             break;
           }
-        } catch (retryE) {
-          console.warn(`[chatCompletionStream] Stripped-tool retry failed:`, retryE.message);
         }
+
+        console.warn(`[chatCompletionStream] Step ${i + 1}/${steps.length} (${m}) produced no usable output (finishReason=${lastFinishReason}). Falling back...`);
+        continue;
       }
 
-      console.warn(`[chatCompletionStream] Step ${i + 1}/${steps.length} (${m} on ${acc.email}) returned ${attempt.status}: ${errText.slice(0, 150)}. Falling back to next step with full context preserved...`);
+      const errText = await attempt.text().catch(() => '');
+      console.warn(`[chatCompletionStream] Step ${i + 1}/${steps.length} (${m} on ${acc.email}) returned ${attempt.status}: ${errText.slice(0, 150)}. Falling back...`);
       await new Promise(r => setTimeout(r, 200));
       continue;
     } catch (e) {
-      console.warn(`[chatCompletionStream] Step ${i + 1} network error on ${step.model}:`, e.message);
+      console.warn(`[chatCompletionStream] Step ${i + 1} error on ${step.model}:`, e.message);
     }
   }
 
-  if (!upstream) {
-    console.warn('[chatCompletionStream] All upstream models returned errors. Sending graceful notice...');
-    let notice = "⚠️ Upstream models are temporarily busy or rate-limited. Please wait a moment or check your account quota at http://localhost:4000.";
-    if (promptText && /\b(image|draw|picture|photo)\b/i.test(promptText)) {
-      notice = "⚠️ Google Antigravity Image Generation Quota has been reached for the current period. Your quota will reset shortly. Tip: Add a 2nd Google account in the dashboard (+ Add Account) for immediate fresh quota!";
-    }
-    const chunk = {
-      id: completionId,
-      object: 'chat.completion.chunk',
-      created: Math.floor(Date.now() / 1000),
-      model: body.model || modelUsed,
-      choices: [{ index: 0, delta: { role: 'assistant', content: notice }, finish_reason: null }],
-    };
-    res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-    res.write(`data: ${JSON.stringify({ id: completionId, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model: body.model || modelUsed, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`);
-    res.write('data: [DONE]\n\n');
-    return res.end();
-  }
-
-  // 1. Send initial assistant role chunk (OpenAI spec requirement for OpenClaw & agent frameworks)
-  res.write(`data: ${JSON.stringify({
-    id: completionId,
-    object: 'chat.completion.chunk',
-    created: Math.floor(Date.now() / 1000),
-    model: body.model || modelUsed,
-    choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }],
-  })}\n\n`);
-
-  const reader = upstream.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let streamTotalText = '';
-  let streamReasoningText = '';
-  let streamErrorMsg = null;
-  let toolIndex = 0;
-  let hadToolCalls = false;
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const payload = line.slice(6).trim();
-        if (!payload || payload === '[DONE]') continue;
-
-        try {
-          const parsed = JSON.parse(payload);
-          if (parsed.error) {
-            console.warn('[chatCompletionStream] Upstream error chunk:', parsed.error);
-            streamErrorMsg = parsed.error.message || parsed.error.status || 'Upstream error';
-            continue;
-          }
-          if (upstreamIsNvidia) {
-            const delta = parsed.choices?.[0]?.delta || {};
-            const text = delta.content || '';
-            const reasoning = delta.reasoning_content || '';
-            const nimTools = delta.tool_calls;
-
-            if (reasoning) {
-              streamReasoningText += reasoning;
-              res.write(`data: ${JSON.stringify({
-                id: completionId,
-                object: 'chat.completion.chunk',
-                created: Math.floor(Date.now() / 1000),
-                model: body.model || modelUsed,
-                choices: [{ index: 0, delta: { reasoning_content: reasoning }, finish_reason: null }],
-              })}\n\n`);
-            }
-
-            if (text) {
-              streamTotalText += text;
-              res.write(`data: ${JSON.stringify({
-                id: completionId,
-                object: 'chat.completion.chunk',
-                created: Math.floor(Date.now() / 1000),
-                model: body.model || modelUsed,
-                choices: [{ index: 0, delta: { content: text }, finish_reason: null }],
-              })}\n\n`);
-            }
-
-            if (nimTools && nimTools.length > 0) {
-              hadToolCalls = true;
-              res.write(`data: ${JSON.stringify({
-                id: completionId,
-                object: 'chat.completion.chunk',
-                created: Math.floor(Date.now() / 1000),
-                model: body.model || modelUsed,
-                choices: [{ index: 0, delta: { tool_calls: nimTools }, finish_reason: null }],
-              })}\n\n`);
-            }
-          } else {
-            const inner = parsed.response || parsed;
-            if (inner.error) {
-              console.warn('[chatCompletionStream] Upstream inner error:', inner.error);
-              streamErrorMsg = inner.error.message || inner.error.status || 'Model error';
-              continue;
-            }
-            const candidate = inner.candidates?.[0];
-            if (candidate?.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'stop') {
-              if (candidate.finishReason === 'SAFETY') {
-                streamErrorMsg = 'Response was filtered due to safety policies.';
-              }
-            }
-            const parts = candidate?.content?.parts || [];
-
-            for (const p of parts) {
-              if (p.thought) {
-                if (p.text) {
-                  streamReasoningText += p.text;
-                  res.write(`data: ${JSON.stringify({
-                    id: completionId,
-                    object: 'chat.completion.chunk',
-                    created: Math.floor(Date.now() / 1000),
-                    model: body.model || modelUsed,
-                    choices: [{ index: 0, delta: { reasoning_content: p.text }, finish_reason: null }],
-                  })}\n\n`);
-                }
-              } else if (p.functionCall) {
-                hadToolCalls = true;
-                const toolCallId = `call_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
-                const sig = p.thoughtSignature || p.thought_signature;
-                if (sig) {
-                  saveThoughtSignature(toolCallId, sig);
-                  saveThoughtSignature(p.functionCall.name, sig);
-                }
-                globalToolCallMap.set(toolCallId, p.functionCall.name);
-                res.write(`data: ${JSON.stringify({
-                  id: completionId,
-                  object: 'chat.completion.chunk',
-                  created: Math.floor(Date.now() / 1000),
-                  model: body.model || modelUsed,
-                  choices: [{
-                    index: 0,
-                    delta: {
-                      tool_calls: [{
-                        index: 0,
-                        id: toolCallId,
-                        type: 'function',
-                        function: {
-                          name: p.functionCall.name,
-                          arguments: typeof p.functionCall.args === 'string' ? p.functionCall.args : JSON.stringify(p.functionCall.args || {}),
-                        },
-                      }],
-                    },
-                    finish_reason: null,
-                  }],
-                })}\n\n`);
-              } else if (p.inlineData && p.inlineData.data) {
-                const isVidPart = isVideoModel(modelUsed) || isVideoModel(body.model);
-                const mime = p.inlineData.mimeType || (isVidPart ? 'video/mp4' : 'image/png');
-                const saved = saveBase64Media(mime, p.inlineData.data);
-                if (saved) {
-                  const mediaHost = body._reqHost || 'http://localhost:4000';
-                  const fullUrl = `${mediaHost}${saved.url}`;
-                  const mediaMarkdown = (saved.isVideo || isVidPart)
-                    ? `\n\n🎥 **Generated Video:**\n[▶️ Watch Video](${fullUrl})\n\n<video controls src="${fullUrl}" width="100%"></video>\n\n`
-                    : `\n\n🖼️ **Generated Image:**\n![Generated Image](${fullUrl})\n\n[📥 Download Image](${fullUrl})\n\n`;
-                  streamTotalText += mediaMarkdown;
-                  res.write(`data: ${JSON.stringify({
-                    id: completionId,
-                    object: 'chat.completion.chunk',
-                    created: Math.floor(Date.now() / 1000),
-                    model: body.model || modelUsed,
-                    choices: [{ index: 0, delta: { content: mediaMarkdown }, finish_reason: null }],
-                  })}\n\n`);
-                }
-              } else if (p.text) {
-                const text = cleanBase64InText(p.text);
-                if (text) {
-                  streamTotalText += text;
-                  res.write(`data: ${JSON.stringify({
-                    id: completionId,
-                    object: 'chat.completion.chunk',
-                    created: Math.floor(Date.now() / 1000),
-                    model: body.model || modelUsed,
-                    choices: [{ index: 0, delta: { content: text }, finish_reason: null }],
-                  })}\n\n`);
-                }
-              }
-            }
-          }
-        } catch {}
-      }
-    }
-  } catch (err) {
-    console.error('[proxy stream error]', err.message);
-  }
-
-  // CRITICAL: Guarantee non-empty content payload if no tool calls were made (prevents OpenClaw payloads=0 error)
-  if (!streamTotalText && !hadToolCalls) {
+  // Guarantee non-empty visible content if every step & retry produced zero text and zero tool calls
+  if (!succeeded && !streamTotalText && !hadToolCalls && !clientClosed) {
     let fallbackText = '';
-    if (streamReasoningText) {
-      // Gemini answered in thought blocks; bridge to content so OpenClaw and standard LLM clients receive valid payload
-      fallbackText = streamReasoningText;
+    if (lastThoughtFallback) {
+      // Emit collected reasoning as visible plain text (not wrapped in <think>) so clients never strip to empty string
+      fallbackText = lastThoughtFallback;
     } else if (streamErrorMsg) {
       fallbackText = `⚠️ Upstream Notice: ${streamErrorMsg}`;
+    } else if (promptText && /\b(image|draw|picture|photo)\b/i.test(promptText)) {
+      fallbackText = "⚠️ Google Antigravity Image Generation Quota has been reached for the current period. Your quota will reset shortly. Tip: Add a 2nd Google account in the dashboard (+ Add Account) for immediate fresh quota!";
     } else {
-      fallbackText = "I have processed your request. How would you like me to proceed?";
+      fallbackText = "⚠️ Upstream models are temporarily busy or rate-limited. Please wait a moment or check your account quota at http://localhost:4000.";
     }
-    res.write(`data: ${JSON.stringify({
-      id: completionId,
-      object: 'chat.completion.chunk',
-      created: Math.floor(Date.now() / 1000),
-      model: body.model || modelUsed,
-      choices: [{ index: 0, delta: { content: fallbackText }, finish_reason: null }],
-    })}\n\n`);
+    emitChunk({ content: fallbackText });
     streamTotalText = fallbackText;
   }
 
-  const estCompTokens = Math.max(1, Math.round(streamTotalText.length / 4));
+  const estCompTokens = usageCompTokens || Math.max(1, Math.round((streamTotalText.length + lastThoughtFallback.length) / 4));
   recordRequestMetric({
     model: body.model || modelUsed,
     accountEmail: accountUsed?.email || 'default',
-    promptTokens: 10,
+    promptTokens: usagePromptTokens,
     completionTokens: estCompTokens,
     latencyMs: Date.now() - startTime,
     status: 200,
   });
 
-  const finalChunk = {
-    id:      completionId,
-    object:  'chat.completion.chunk',
-    created: Math.floor(Date.now() / 1000),
-    model:   body.model || modelUsed,
-    choices: [{ index: 0, delta: {}, finish_reason: hadToolCalls ? 'tool_calls' : 'stop' }],
-  };
-  res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
-  res.write('data: [DONE]\n\n');
+  if (!clientClosed) {
+    const finalReason = mapGeminiFinishReason(lastFinishReason, hadToolCalls);
+    emitChunk({}, finalReason);
+    if (body.stream_options?.include_usage === true) {
+      res.write(`data: ${JSON.stringify({
+        id: completionId,
+        object: 'chat.completion.chunk',
+        created: Math.floor(Date.now() / 1000),
+        model: body.model || modelUsed,
+        choices: [],
+        usage: {
+          prompt_tokens: usagePromptTokens,
+          completion_tokens: estCompTokens,
+          total_tokens: usagePromptTokens + estCompTokens,
+        },
+      })}\n\n`);
+    }
+    res.write('data: [DONE]\n\n');
+  }
   res.end();
 }
 
@@ -2280,8 +2436,10 @@ export function normalizeAnthropicToOpenAI(body) {
     max_tokens: body.max_tokens,
     temperature: body.temperature,
     top_p: body.top_p,
+    stop: body.stop_sequences,
     stream: body.stream,
     tools: body.tools,
+    tool_choice: body.tool_choice,
   };
 }
 
@@ -2359,12 +2517,9 @@ export async function anthropicMessageStream(body, res) {
   const promptText = extractLastUserPrompt(openAiReq.messages || []);
   const primaryModel = resolveModel(openAiReq.model || 'auto-fallback', promptText);
   const { systemInstruction, contents } = convertMessages(openAiReq.messages || [], openAiReq.tools || body.tools);
-  const tools = convertToolsToGemini(openAiReq.tools || body.tools);
-
-  const baseGenConfig = {};
-  if (openAiReq.temperature !== undefined)  baseGenConfig.temperature     = openAiReq.temperature;
-  if (openAiReq.max_tokens !== undefined)   baseGenConfig.maxOutputTokens = Math.min(openAiReq.max_tokens, 65535);
-  if (openAiReq.top_p !== undefined)        baseGenConfig.topP            = openAiReq.top_p;
+  const tools = convertToolsToGemini(openAiReq.tools || body.tools, openAiReq.tool_choice);
+  const toolConfig = convertToolChoiceToGemini(openAiReq.tool_choice, !!tools);
+  const baseGenConfig = buildBaseGenConfig(openAiReq);
 
   const msgId = `msg_${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`;
 
@@ -2380,11 +2535,171 @@ export async function anthropicMessageStream(body, res) {
     clientClosed = true;
   });
 
+  const emitEvent = (eventName, dataObj) => {
+    if (clientClosed) return;
+    res.write(`event: ${eventName}\ndata: ${JSON.stringify(dataObj)}\n\n`);
+  };
+
+  // 1. message_start
+  emitEvent('message_start', {
+    type: 'message_start',
+    message: {
+      id: msgId,
+      type: 'message',
+      role: 'assistant',
+      content: [],
+      model: body.model || primaryModel,
+      stop_reason: null,
+      stop_sequence: null,
+      usage: { input_tokens: 15, output_tokens: 1 },
+    },
+  });
+
   const steps = resolveExecutionSteps(primaryModel);
-  let upstream = null;
-  let upstreamIsNvidia = false;
   let modelUsed = primaryModel;
   let accountUsed = null;
+  let streamTotalText = '';
+  let lastThoughtFallback = '';
+  let streamErrorMsg = null;
+  let currentBlockIndex = 0;
+  let currentBlockType = null;
+  let hadToolCalls = false;
+  let usageOutputTokens = 0;
+
+  const ensureBlockType = (nextType) => {
+    if (currentBlockType === nextType) return;
+    if (currentBlockType !== null) {
+      emitEvent('content_block_stop', { type: 'content_block_stop', index: currentBlockIndex++ });
+    }
+    currentBlockType = nextType;
+    if (nextType === 'thinking') {
+      emitEvent('content_block_start', { type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'thinking', thinking: '' } });
+    } else if (nextType === 'text') {
+      emitEvent('content_block_start', { type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'text', text: '' } });
+    }
+  };
+
+  const closeCurrentBlock = () => {
+    if (currentBlockType !== null) {
+      emitEvent('content_block_stop', { type: 'content_block_stop', index: currentBlockIndex++ });
+      currentBlockType = null;
+    }
+  };
+
+  const consumeAnthropicUpstream = async (upstream, isNvidiaStream) => {
+    let stepText = '';
+    let stepReasoning = '';
+    let stepHadTools = false;
+    let stepErr = null;
+
+    await readSseStream(upstream.body.getReader(), (parsed) => {
+      if (parsed.error) {
+        console.warn('[anthropic stream] Upstream error chunk:', parsed.error);
+        stepErr = parsed.error.message || parsed.error.status || 'Upstream error';
+        return;
+      }
+
+      if (isNvidiaStream) {
+        const delta = parsed.choices?.[0]?.delta || {};
+        const text = delta.content || '';
+        const reasoning = delta.reasoning_content || '';
+        const nimTools = delta.tool_calls;
+
+        if (reasoning) {
+          stepReasoning += reasoning;
+          ensureBlockType('thinking');
+          emitEvent('content_block_delta', { type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'thinking_delta', thinking: reasoning } });
+        }
+        if (text) {
+          stepText += text;
+          streamTotalText += text;
+          ensureBlockType('text');
+          emitEvent('content_block_delta', { type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'text_delta', text } });
+        }
+        if (nimTools && nimTools.length > 0) {
+          stepHadTools = true;
+          hadToolCalls = true;
+          for (const tc of nimTools) {
+            closeCurrentBlock();
+            const toolId = tc.id || `toolu_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
+            const fnName = tc.function?.name || 'tool';
+            emitEvent('content_block_start', { type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'tool_use', id: toolId, name: fnName, input: {} } });
+            emitEvent('content_block_delta', { type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'input_json_delta', partial_json: tc.function?.arguments || '{}' } });
+            emitEvent('content_block_stop', { type: 'content_block_stop', index: currentBlockIndex++ });
+          }
+        }
+        return;
+      }
+
+      const inner = parsed.response || parsed;
+      if (inner.error) {
+        console.warn('[anthropic stream] Upstream inner error:', inner.error);
+        stepErr = inner.error.message || inner.error.status || 'Model error';
+        return;
+      }
+      if (inner.usageMetadata?.candidatesTokenCount) {
+        usageOutputTokens = inner.usageMetadata.candidatesTokenCount;
+      }
+      const candidate = inner.candidates?.[0];
+      if (candidate?.finishReason === 'SAFETY') {
+        stepErr = 'Response was filtered due to safety policies.';
+      }
+      const parts = candidate?.content?.parts || [];
+
+      for (const p of parts) {
+        if (p.thought) {
+          if (p.text) {
+            stepReasoning += p.text;
+            ensureBlockType('thinking');
+            emitEvent('content_block_delta', { type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'thinking_delta', thinking: p.text } });
+          }
+        } else if (p.functionCall && p.functionCall.name) {
+          stepHadTools = true;
+          hadToolCalls = true;
+          closeCurrentBlock();
+          const toolId = `toolu_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
+          const sig = p.thoughtSignature || p.thought_signature;
+          if (sig) {
+            saveThoughtSignature(toolId, sig);
+            saveThoughtSignature(p.functionCall.name, sig);
+          }
+          globalToolCallMap.set(toolId, p.functionCall.name);
+          emitEvent('content_block_start', { type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'tool_use', id: toolId, name: p.functionCall.name, input: {} } });
+          emitEvent('content_block_delta', { type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'input_json_delta', partial_json: JSON.stringify(p.functionCall.args || {}) } });
+          emitEvent('content_block_stop', { type: 'content_block_stop', index: currentBlockIndex++ });
+        } else if (p.inlineData && p.inlineData.data) {
+          const isVidPart = isVideoModel(modelUsed) || isVideoModel(body.model);
+          const mime = p.inlineData.mimeType || (isVidPart ? 'video/mp4' : 'image/png');
+          const saved = saveBase64Media(mime, p.inlineData.data);
+          if (saved) {
+            const mediaHost = body._reqHost || 'http://localhost:4000';
+            const fullUrl = `${mediaHost}${saved.url}`;
+            const mediaMarkdown = (saved.isVideo || isVidPart)
+              ? `\n\n🎥 **Generated Video:**\n[▶️ Watch Video](${fullUrl})\n\n<video controls src="${fullUrl}" width="100%"></video>\n\n`
+              : `\n\n🖼️ **Generated Image:**\n![Generated Image](${fullUrl})\n\n[📥 Download Image](${fullUrl})\n\n`;
+            stepText += mediaMarkdown;
+            streamTotalText += mediaMarkdown;
+            ensureBlockType('text');
+            emitEvent('content_block_delta', { type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'text_delta', text: mediaMarkdown } });
+          }
+        } else if (p.text) {
+          const text = cleanBase64InText(p.text);
+          if (text) {
+            stepText += text;
+            streamTotalText += text;
+            ensureBlockType('text');
+            emitEvent('content_block_delta', { type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'text_delta', text } });
+          }
+        }
+      }
+    });
+
+    if (stepReasoning && !lastThoughtFallback) lastThoughtFallback = stepReasoning;
+    if (stepErr) streamErrorMsg = stepErr;
+    return stepText.length > 0 || stepHadTools;
+  };
+
+  let succeeded = false;
 
   for (let i = 0; i < steps.length; i++) {
     if (clientClosed) break;
@@ -2397,14 +2712,12 @@ export async function anthropicMessageStream(body, res) {
       try {
         const rawKeyId = step.accountId && step.accountId.startsWith('nvidia:') ? step.accountId.slice(7) : step.accountId;
         const nimKeyObj = getRawNvidiaKey(rawKeyId);
-        if (!nimKeyObj || !nimKeyObj.key) {
-          console.warn(`[anthropic stream] Step ${i + 1}/${steps.length} (${step.model}): No active NVIDIA NIM key. Falling back...`);
-          continue;
-        }
+        if (!nimKeyObj || !nimKeyObj.key) continue;
 
         const formattedMessages = formatMessagesForOpenAI(openAiReq.messages || []);
+        const nimMaxTok = (typeof openAiReq.max_tokens === 'number' && openAiReq.max_tokens > 0) ? Math.min(openAiReq.max_tokens, 16384) : 4096;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const timeoutId = setTimeout(() => controller.abort(), 45000);
         let attempt;
         try {
           attempt = await fetch(NVIDIA_NIM_ENDPOINT, {
@@ -2417,11 +2730,11 @@ export async function anthropicMessageStream(body, res) {
             body: JSON.stringify({
               model: step.model.replace(/^nim:/, ''),
               messages: formattedMessages,
-              temperature: openAiReq.temperature !== undefined ? openAiReq.temperature : 0.7,
-              max_tokens: openAiReq.max_tokens !== undefined ? Math.min(openAiReq.max_tokens, 4096) : 1024,
-              top_p: openAiReq.top_p !== undefined ? openAiReq.top_p : 1,
+              temperature: typeof openAiReq.temperature === 'number' ? openAiReq.temperature : 0.7,
+              max_tokens: nimMaxTok,
+              top_p: typeof openAiReq.top_p === 'number' ? openAiReq.top_p : 1,
               stream: true,
-              ...(body.tools ? { tools: body.tools } : {}),
+              ...(Array.isArray(body.tools) && body.tools.length > 0 ? { tools: body.tools } : {}),
             }),
             signal: controller.signal,
           });
@@ -2430,49 +2743,23 @@ export async function anthropicMessageStream(body, res) {
         }
 
         if (attempt.ok) {
-          upstream = attempt;
-          upstreamIsNvidia = true;
           modelUsed = step.model;
           accountUsed = { email: `NIM (${nimKeyObj.name})` };
-          break;
+          if (await consumeAnthropicUpstream(attempt, true)) {
+            succeeded = true;
+            break;
+          }
+          continue;
         }
-
-        const errText = await attempt.text();
-        console.warn(`[anthropic stream] Step ${i + 1}/${steps.length} (${step.model}) NVIDIA NIM returned ${attempt.status}: ${errText.slice(0, 150)}. Falling back...`);
         await new Promise(r => setTimeout(r, 200));
         continue;
       } catch (e) {
-        console.warn(`[anthropic stream] Step ${i + 1} NVIDIA NIM network error:`, e.message);
-        await new Promise(r => setTimeout(r, 200));
+        console.warn(`[anthropic stream] Step ${i + 1} NIM error:`, e.message);
         continue;
       }
     }
 
-    const isGeminiWeb = step.provider === 'gemini-web' ||
-                        (step.accountId && step.accountId.startsWith('cookie:')) ||
-                        isGeminiWebModel(step.model);
-
-    let acc = null;
-    let cookieObj = null;
-    if (step.accountId && step.accountId.startsWith('cookie:')) {
-      cookieObj = getRawGeminiCookie(step.accountId.slice(7));
-    } else if (isGeminiWeb) {
-      cookieObj = getNextGeminiCookie();
-    }
-
-    if (cookieObj && cookieObj.cookie) {
-      acc = {
-        id: `cookie:${cookieObj.id}`,
-        email: `Gemini Web (${cookieObj.name})`,
-        accessToken: cookieObj.cookie,
-        projectId: 'aicode-consumers',
-        enabled: true,
-        isCookie: true,
-      };
-    } else {
-      acc = (step.accountId && !step.accountId.startsWith('cookie:') && !step.accountId.startsWith('nvidia:') ? getRawAccount(step.accountId) : null) || getNextAccount();
-    }
-    if (!acc || !acc.enabled) acc = getNextAccount();
+    let acc = resolveAccountForStep(step);
     if (!acc) continue;
 
     try {
@@ -2484,375 +2771,77 @@ export async function anthropicMessageStream(body, res) {
       const stepGenConfig = { ...baseGenConfig };
       if (isImg) stepGenConfig.responseModalities = ['IMAGE'];
       else if (isVid) stepGenConfig.responseModalities = ['VIDEO'];
-      if (step.model === 'gemini-web-thinking') {
-        stepGenConfig.thinkingConfig = { thinkingBudget: 4096 };
-      } else if (!step.model.includes('thinking') && !(body.model && body.model.includes('thinking')) && body.thinking === undefined) {
-        if (actualModel.includes('2.5-flash') || actualModel.includes('2.0-flash')) {
-          stepGenConfig.thinkingConfig = { thinkingBudget: 0 };
-        }
-      }
+      applyThinkingConfig(stepGenConfig, step.model, body.model, actualModel);
 
-      const requestBody = {
-        project: acc.projectId || `proxy-${crypto.randomUUID().slice(0, 8)}`,
-        model: actualModel,
-        request: {
-          contents,
-          ...(systemInstruction && { systemInstruction }),
-          ...(Object.keys(stepGenConfig).length && { generationConfig: stepGenConfig }),
-          ...(tools && { tools }),
-        },
-        requestType: 'agent',
-        userAgent: USER_AGENT,
-        requestId: `agent-${crypto.randomUUID()}`,
-      };
-
-      const controller = new AbortController();
-      const timeoutMs = (isImg || isVid) ? 90000 : 45000;
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      let attempt;
-      try {
-        if (token.startsWith('AIzaSy')) {
-          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse&key=${token}`;
-          attempt = await fetch(directUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'text/event-stream',
-            },
-            body: JSON.stringify({
-              contents,
-              ...(systemInstruction && { systemInstruction }),
-              ...(Object.keys(stepGenConfig).length && { generationConfig: stepGenConfig }),
-              ...(tools && { tools }),
-            }),
-            signal: controller.signal,
-          });
-        } else {
-          attempt = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`, {
-            method: 'POST',
-            headers: {
-              Authorization:  `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'User-Agent':   USER_AGENT,
-              Accept:         'text/event-stream',
-            },
-            body: JSON.stringify(requestBody),
-            signal: controller.signal,
-          });
-        }
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      // 401 Unauthorized: automatically force refresh OAuth token and retry immediately
-      if (attempt.status === 401 && acc.refreshToken) {
-        console.warn(`[anthropic stream] 401 Unauthorized on ${acc.email}. Forcing token refresh and retrying once...`);
-        try {
-          const freshToken = await ensureToken(acc, true);
-          const retryAttempt = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`, {
-            method: 'POST',
-            headers: {
-              Authorization:  `Bearer ${freshToken}`,
-              'Content-Type': 'application/json',
-              'User-Agent':   USER_AGENT,
-              Accept:         'text/event-stream',
-            },
-            body: JSON.stringify(requestBody),
-          });
-          if (retryAttempt.ok) attempt = retryAttempt;
-        } catch (retryErr) {
-          console.warn(`[anthropic stream] Token refresh retry failed on ${acc.email}:`, retryErr.message);
-        }
-      }
-
-      // 429 Rate Limit: immediately attempt same model on alternate enabled account if available
-      if (attempt.status === 429 && !acc.isCookie) {
-        const otherAccounts = getEnabledAccounts().filter(a => a.id !== acc.id && !a.isCookie);
-        if (otherAccounts.length > 0) {
-          console.warn(`[anthropic stream] ${acc.email} rate-limited (429). Instantly attempting on alternate account ${otherAccounts[0].email}...`);
-          try {
-            const altAcc = otherAccounts[0];
-            const altToken = await ensureToken(altAcc);
-            const altBody = { ...requestBody, project: altAcc.projectId || requestBody.project };
-            const altAttempt = await fetch(`${ANTIGRAVITY_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`, {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${altToken}`,
-                'Content-Type': 'application/json',
-                'User-Agent': USER_AGENT,
-                Accept: 'text/event-stream',
-              },
-              body: JSON.stringify(altBody),
-            });
-            if (altAttempt.ok) {
-              attempt = altAttempt;
-              acc = altAcc;
-            }
-          } catch (altErr) {
-            console.warn(`[anthropic stream] Alt-account failover failed:`, altErr.message);
-          }
-        }
-      }
+      const { res: attempt, acc: activeAcc, token: activeToken } = await fetchGeminiWithRecovery({
+        acc,
+        token,
+        m,
+        actualModel,
+        contents,
+        systemInstruction,
+        stepGenConfig,
+        tools,
+        toolConfig,
+        stream: true,
+        isImg,
+        isVid,
+        logTag: 'anthropicStream',
+      });
+      acc = activeAcc;
 
       if (attempt.ok) {
-        upstream = attempt;
         modelUsed = m;
         accountUsed = acc;
-        break;
+        if (await consumeAnthropicUpstream(attempt, false)) {
+          succeeded = true;
+          break;
+        }
+        if (tools && !clientClosed) {
+          const { thinkingConfig: _, ...cfgNoThink } = stepGenConfig;
+          const retry = await fetchGeminiWithRecovery({
+            acc,
+            token: activeToken,
+            m,
+            actualModel,
+            contents: stripToolsFromContents(contents),
+            systemInstruction,
+            stepGenConfig: cfgNoThink,
+            tools: undefined,
+            toolConfig: undefined,
+            stream: true,
+            isImg,
+            isVid,
+            logTag: 'anthropicStream-retry',
+          });
+          if (retry.res.ok && await consumeAnthropicUpstream(retry.res, false)) {
+            succeeded = true;
+            break;
+          }
+        }
+        continue;
       }
 
-      const errText = await attempt.text();
-      console.warn(`[anthropic stream] Step ${i + 1}/${steps.length} (${m} on ${acc.email}) returned ${attempt.status}: ${errText}. Auto-fallback to next combo step with full context...`);
+      const errText = await attempt.text().catch(() => '');
+      console.warn(`[anthropic stream] Step ${i + 1}/${steps.length} (${m} on ${acc.email}) returned ${attempt.status}: ${errText.slice(0, 150)}. Falling back...`);
       await new Promise(r => setTimeout(r, 200));
       continue;
     } catch (e) {
-      console.warn(`[anthropic stream] Step ${i + 1} network attempt failed on ${step.model}:`, e.message);
+      console.warn(`[anthropic stream] Step ${i + 1} error on ${step.model}:`, e.message);
     }
   }
 
-  if (!upstream) {
-    console.warn('[anthropic stream] All upstream models returned errors. Sending graceful fallback message to Claude...');
-    res.write(`event: message_start\ndata: ${JSON.stringify({
-      type: 'message_start',
-      message: {
-        id: msgId,
-        type: 'message',
-        role: 'assistant',
-        content: [],
-        model: body.model || 'gemini-2.5-flash',
-        stop_reason: null,
-        stop_sequence: null,
-        usage: { input_tokens: 10, output_tokens: 15 }
-      }
-    })}\n\n`);
+  closeCurrentBlock();
 
-    res.write(`event: content_block_start\ndata: ${JSON.stringify({
-      type: 'content_block_start',
-      index: 0,
-      content_block: { type: 'text', text: '' }
-    })}\n\n`);
-
-    const fallbackMsg = "⚠️ Proxy Notice: Upstream models were temporarily rate-limited or busy. Please check your models in your Combo or try again shortly.";
-    res.write(`event: content_block_delta\ndata: ${JSON.stringify({
-      type: 'content_block_delta',
-      index: 0,
-      delta: { type: 'text_delta', text: fallbackMsg }
-    })}\n\n`);
-
-    res.write(`event: content_block_stop\ndata: ${JSON.stringify({
-      type: 'content_block_stop',
-      index: 0
-    })}\n\n`);
-
-    res.write(`event: message_delta\ndata: ${JSON.stringify({
-      type: 'message_delta',
-      delta: { stop_reason: 'end_turn', stop_sequence: null },
-      usage: { output_tokens: 15 }
-    })}\n\n`);
-
-    res.write(`event: message_stop\ndata: ${JSON.stringify({
-      type: 'message_stop'
-    })}\n\n`);
-
-    res.end();
-    return;
-  }
-  res.flushHeaders();
-
-  // 1. message_start
-  res.write(`event: message_start\ndata: ${JSON.stringify({
-    type: 'message_start',
-    message: {
-      id: msgId,
-      type: 'message',
-      role: 'assistant',
-      content: [],
-      model: body.model || modelUsed,
-      stop_reason: null,
-      stop_sequence: null,
-      usage: { input_tokens: 15, output_tokens: 1 }
-    }
-  })}\n\n`);
-
-  const reader = upstream.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let streamTotalText = '';
-  let streamReasoningText = '';
-  let streamErrorMsg = null;
-  let currentBlockIndex = 0;
-  let currentBlockType = null;
-  let hadToolCalls = false;
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const payload = line.slice(6).trim();
-        if (!payload || payload === '[DONE]') continue;
-
-        try {
-          const parsed = JSON.parse(payload);
-          if (parsed.error) {
-            console.warn('[anthropic stream] Upstream error chunk:', parsed.error);
-            streamErrorMsg = parsed.error.message || parsed.error.status || 'Upstream error';
-            continue;
-          }
-          if (upstreamIsNvidia) {
-            const delta = parsed.choices?.[0]?.delta || {};
-            const text = delta.content || '';
-            const reasoning = delta.reasoning_content || '';
-            const nimTools = delta.tool_calls;
-
-            if (reasoning) {
-              streamReasoningText += reasoning;
-              if (currentBlockType !== 'thinking') {
-                if (currentBlockType !== null) {
-                  res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-                }
-                currentBlockType = 'thinking';
-                res.write(`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'thinking', thinking: '' } })}\n\n`);
-              }
-              res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'thinking_delta', thinking: reasoning } })}\n\n`);
-            }
-
-            if (text) {
-              streamTotalText += text;
-              if (currentBlockType !== 'text') {
-                if (currentBlockType !== null) {
-                  res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-                }
-                currentBlockType = 'text';
-                res.write(`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'text', text: '' } })}\n\n`);
-              }
-              res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'text_delta', text } })}\n\n`);
-            }
-
-            if (nimTools && nimTools.length > 0) {
-              hadToolCalls = true;
-              for (const tc of nimTools) {
-                if (currentBlockType !== null) {
-                  res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-                  currentBlockType = null;
-                }
-                const toolId = tc.id || `toolu_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
-                const fnName = tc.function?.name || 'tool';
-                res.write(`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'tool_use', id: toolId, name: fnName, input: {} } })}\n\n`);
-                res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'input_json_delta', partial_json: tc.function?.arguments || '{}' } })}\n\n`);
-                res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-              }
-            }
-          } else {
-            const inner = parsed.response || parsed;
-            if (inner.error) {
-              console.warn('[anthropic stream] Upstream inner error:', inner.error);
-              streamErrorMsg = inner.error.message || inner.error.status || 'Model error';
-              continue;
-            }
-            const candidate = inner.candidates?.[0];
-            if (candidate?.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'stop') {
-              if (candidate.finishReason === 'SAFETY') {
-                streamErrorMsg = 'Response was filtered due to safety policies.';
-              }
-            }
-            const parts = candidate?.content?.parts || [];
-
-            for (const p of parts) {
-              if (p.thought) {
-                if (p.text) {
-                  streamReasoningText += p.text;
-                  if (currentBlockType !== 'thinking') {
-                    if (currentBlockType !== null) {
-                      res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-                    }
-                    currentBlockType = 'thinking';
-                    res.write(`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'thinking', thinking: '' } })}\n\n`);
-                  }
-                  res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'thinking_delta', thinking: p.text } })}\n\n`);
-                }
-              } else if (p.functionCall) {
-                hadToolCalls = true;
-                if (currentBlockType !== null) {
-                  res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-                  currentBlockType = null;
-                }
-                const toolId = `toolu_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
-                const sig = p.thoughtSignature || p.thought_signature;
-                if (sig) {
-                  saveThoughtSignature(toolId, sig);
-                  saveThoughtSignature(p.functionCall.name, sig);
-                }
-                globalToolCallMap.set(toolId, p.functionCall.name);
-                res.write(`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'tool_use', id: toolId, name: p.functionCall.name, input: {} } })}\n\n`);
-                res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'input_json_delta', partial_json: JSON.stringify(p.functionCall.args || {}) } })}\n\n`);
-                res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-              } else if (p.inlineData && p.inlineData.data) {
-                const isVidPart = isVideoModel(modelUsed) || isVideoModel(body.model);
-                const mime = p.inlineData.mimeType || (isVidPart ? 'video/mp4' : 'image/png');
-                const saved = saveBase64Media(mime, p.inlineData.data);
-                if (saved) {
-                  const mediaHost = body._reqHost || 'http://localhost:4000';
-                  const fullUrl = `${mediaHost}${saved.url}`;
-                  const mediaMarkdown = (saved.isVideo || isVidPart)
-                    ? `\n\n🎥 **Generated Video:**\n[▶️ Watch Video](${fullUrl})\n\n<video controls src="${fullUrl}" width="100%"></video>\n\n`
-                    : `\n\n🖼️ **Generated Image:**\n![Generated Image](${fullUrl})\n\n[📥 Download Image](${fullUrl})\n\n`;
-                  streamTotalText += mediaMarkdown;
-                  if (currentBlockType !== 'text') {
-                    if (currentBlockType !== null) {
-                      res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-                    }
-                    currentBlockType = 'text';
-                    res.write(`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'text', text: '' } })}\n\n`);
-                  }
-                  res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'text_delta', text: mediaMarkdown } })}\n\n`);
-                }
-              } else if (p.text) {
-                const text = cleanBase64InText(p.text);
-                if (text) {
-                  streamTotalText += text;
-                  if (currentBlockType !== 'text') {
-                    if (currentBlockType !== null) {
-                      res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-                    }
-                    currentBlockType = 'text';
-                    res.write(`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'text', text: '' } })}\n\n`);
-                  }
-                  res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'text_delta', text } })}\n\n`);
-                }
-              }
-            }
-          }
-        } catch {}
-      }
-    }
-  } catch (err) {
-    console.error('[anthropic stream error]', err.message);
+  if (!succeeded && !streamTotalText && !hadToolCalls && !clientClosed) {
+    const fallbackNotice = lastThoughtFallback || streamErrorMsg || "⚠️ Proxy Notice: Upstream models are temporarily busy or rate-limited. Please try again shortly or check your Combo.";
+    ensureBlockType('text');
+    emitEvent('content_block_delta', { type: 'content_block_delta', index: currentBlockIndex, delta: { type: 'text_delta', text: fallbackNotice } });
+    closeCurrentBlock();
+    streamTotalText = fallbackNotice;
   }
 
-  if (currentBlockType !== null) {
-    res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-    currentBlockType = null;
-  }
-
-  if (!streamTotalText && !hadToolCalls) {
-    res.write(`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: currentBlockIndex, content_block: { type: 'text', text: '' } })}\n\n`);
-    const fallbackNotice = streamReasoningText || streamErrorMsg || "⚠️ Proxy Notice: Upstream stream produced no output or was interrupted. Try again or check models in your Combo.";
-    res.write(`event: content_block_delta\ndata: ${JSON.stringify({
-      type: 'content_block_delta',
-      index: currentBlockIndex,
-      delta: { type: 'text_delta', text: fallbackNotice }
-    })}\n\n`);
-    res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: currentBlockIndex++ })}\n\n`);
-  }
-
-  const estCompTokens = Math.max(1, Math.round(streamTotalText.length / 4));
+  const estCompTokens = usageOutputTokens || Math.max(1, Math.round(streamTotalText.length / 4));
   recordRequestMetric({
     model: body.model || modelUsed,
     accountEmail: accountUsed?.email || 'default',
@@ -2862,17 +2851,12 @@ export async function anthropicMessageStream(body, res) {
     status: 200,
   });
 
-  // 4. message_delta
-  res.write(`event: message_delta\ndata: ${JSON.stringify({
+  emitEvent('message_delta', {
     type: 'message_delta',
     delta: { stop_reason: hadToolCalls ? 'tool_use' : 'end_turn', stop_sequence: null },
-    usage: { output_tokens: estCompTokens }
-  })}\n\n`);
-
-  // 5. message_stop
-  res.write(`event: message_stop\ndata: ${JSON.stringify({
-    type: 'message_stop'
-  })}\n\n`);
+    usage: { output_tokens: estCompTokens },
+  });
+  emitEvent('message_stop', { type: 'message_stop' });
 
   res.end();
 }
