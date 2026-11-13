@@ -171,27 +171,16 @@ async function cmdStart(args) {
     const serverScript = path.join(ROOT_DIR, 'server.js');
     let pid = null;
 
-    if (process.platform === 'win32') {
-      // On Windows, spawn node via cmd.exe /c start /b with hidden window to detach cleanly from parent job
-      const child = spawn('cmd.exe', ['/c', 'start', '/b', '""', process.execPath, serverScript], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-        env: { ...process.env, PORT: String(port), AG_LOG_FILE: LOG_FILE },
-        cwd: ROOT_DIR,
-      });
-      child.unref();
-    } else {
-      const child = spawn(process.execPath, [serverScript], {
-        detached: true,
-        stdio: 'ignore',
-        env: { ...process.env, PORT: String(port), AG_LOG_FILE: LOG_FILE },
-        cwd: ROOT_DIR,
-      });
-      pid = child.pid;
-      fs.writeFileSync(PID_FILE, String(pid), 'utf-8');
-      child.unref();
-    }
+    const child = spawn(process.execPath, [serverScript], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+      env: { ...process.env, PORT: String(port), AG_LOG_FILE: LOG_FILE },
+      cwd: ROOT_DIR,
+    });
+    pid = child.pid;
+    fs.writeFileSync(PID_FILE, String(pid), 'utf-8');
+    child.unref();
 
     // Verify online
     process.stdout.write('   Waiting for server initialization...');
