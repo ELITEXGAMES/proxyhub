@@ -56,11 +56,9 @@ npm install --omit=dev
 chmod +x bin/anti.js bin/cli.js
 
 echo "🔗 Linking CLI globally..."
-if npm link 2>/dev/null; then
-    echo "✅ Linked via npm link"
-else
-    echo "⚠️  npm link required elevated permissions. Trying with sudo..."
-    sudo npm link 2>/dev/null || true
+npm link 2>/dev/null || sudo npm link 2>/dev/null || true
+if [ -d "$HOME/.config/nvm" ]; then
+    sudo chown -R $(id -u):$(id -g) "$HOME/.config/nvm" 2>/dev/null || true
 fi
 
 # Ensure symlinks exist in /usr/local/bin and ~/.local/bin pointing to updated installation
