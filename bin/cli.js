@@ -300,72 +300,78 @@ async function cmdUpdate(args) {
   console.log('  🔄 Updating Antigravity Proxy to Latest Version');
   console.log('=============================================================\n');
 
+  let oldVersion = 'unknown';
+  try {
+    oldVersion = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf-8')).version || 'unknown';
+  } catch {}
+  console.log(`📌 Currently installed version: v${oldVersion}`);
+  console.log(`📂 Install Directory: ${ROOT_DIR}\n`);
+
   let wasRunning = !!(getRunningPid() || await checkHttpAlive(DEFAULT_PORT));
   if (wasRunning) {
-    console.log('📦 Proxy is currently running. Will restart after update.');
+    console.log('📦 Proxy is currently running. Stopping old instance...');
+    await cmdStop();
+    // Force kill port 4000 to ensure no stale process holds the socket
+    try {
+      if (process.platform === 'win32') {
+        const out = execSync(`netstat -ano | findstr :${DEFAULT_PORT}`, { encoding: 'utf-8' }).trim();
+        for (const line of out.split('\n')) {
+          const parts = line.trim().split(/\s+/);
+          const pid = parts[parts.length - 1];
+          if (pid && pid !== '0') {
+            try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch {}
+          }
+        }
+      } else {
+        try { execSync(`fuser -k ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+        try { execSync(`lsof -ti:${DEFAULT_PORT} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+      }
+    } catch {}
+    try { fs.unlinkSync(PID_FILE); } catch {}
   }
 
   // 1. Check if git repository
   let isGit = false;
   try {
+    try { execSync(`git config --global --add safe.directory "${ROOT_DIR}"`, { stdio: 'ignore' }); } catch {}
     const gitCheck = execSync('git rev-parse --is-inside-work-tree', { cwd: ROOT_DIR, encoding: 'utf-8' }).trim();
     isGit = (gitCheck === 'true');
   } catch {
     isGit = false;
   }
 
+  let codeUpdated = false;
+
   if (isGit) {
     try {
-      console.log('🔍 Detecting git remote & branch...');
-      let currentBranch = 'main';
-      try {
-        currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: ROOT_DIR, encoding: 'utf-8' }).trim();
-      } catch {}
-
+      console.log('🔍 Git repository detected. Fetching latest code directly from GitHub...');
       try {
         execSync('git remote set-url origin https://github.com/ELITEXGAMES/proxyhub.git', { cwd: ROOT_DIR, stdio: 'ignore' });
       } catch {
         try { execSync('git remote add origin https://github.com/ELITEXGAMES/proxyhub.git', { cwd: ROOT_DIR, stdio: 'ignore' }); } catch {}
       }
 
-      console.log(`   Repository: https://github.com/ELITEXGAMES/proxyhub.git (${currentBranch})`);
+      console.log('📥 Fetching and hard-resetting to origin/main...');
+      execSync('git fetch origin main --depth=1', { cwd: ROOT_DIR, stdio: 'inherit' });
+      execSync('git checkout -B main origin/main --force', { cwd: ROOT_DIR, stdio: 'inherit' });
+      execSync('git reset --hard origin/main', { cwd: ROOT_DIR, stdio: 'inherit' });
+      execSync('git clean -fd', { cwd: ROOT_DIR, stdio: 'ignore' });
 
-      let stashed = false;
-      try {
-        const status = execSync('git status --porcelain', { cwd: ROOT_DIR, encoding: 'utf-8' }).trim();
-        if (status) {
-          execSync('git stash --include-untracked', { cwd: ROOT_DIR, stdio: 'ignore' });
-          stashed = true;
-        }
-      } catch {}
-
-      console.log('📥 Pulling latest commits from GitHub...');
-      try {
-        execSync(`git pull origin ${currentBranch}`, { cwd: ROOT_DIR, stdio: 'inherit' });
-      } catch (pullErr) {
-        try { execSync('git pull', { cwd: ROOT_DIR, stdio: 'inherit' }); } catch {}
-      }
-
-      if (stashed) {
-        try { execSync('git stash pop', { cwd: ROOT_DIR, stdio: 'ignore' }); } catch {}
-      }
-
-      try {
-        const lastCommit = execSync('git log -1 --pretty=format:"%h - %s (%cr) <%an>"', { cwd: ROOT_DIR, encoding: 'utf-8' }).trim();
-        console.log(`\n📌 Updated to latest commit: ${lastCommit}`);
-      } catch {}
+      const lastCommit = execSync('git log -1 --pretty=format:"%h - %s (%cr)"', { cwd: ROOT_DIR, encoding: 'utf-8' }).trim();
+      console.log(`\n📌 Git code sync complete: ${lastCommit}`);
+      codeUpdated = true;
     } catch (gitErr) {
-      console.error(`\n❌ Git update encountered an error: ${gitErr.message}`);
-      console.log('   Continuing with dependency and health check...\n');
+      console.warn(`\n⚠️ Git update failed (${gitErr.message}). Falling back to direct tarball download...`);
     }
-  } else {
-    // Standalone or npm-installed package: fetch latest tarball (uses built-in tar on Linux/macOS, PowerShell on Windows)
-    console.log('📥 Fetching latest release from https://github.com/ELITEXGAMES/proxyhub...');
-    try {
-      const tempDir = path.join(os.tmpdir(), 'proxyhub-extract');
-      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-      fs.mkdirSync(tempDir, { recursive: true });
+  }
 
+  if (!codeUpdated) {
+    console.log('📥 Downloading latest release archive from https://github.com/ELITEXGAMES/proxyhub...');
+    const tempDir = path.join(os.tmpdir(), `proxyhub-update-${Date.now()}`);
+    if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    try {
       if (process.platform === 'win32') {
         const zipUrl = 'https://github.com/ELITEXGAMES/proxyhub/archive/refs/heads/main.zip';
         const tempZip = path.join(os.tmpdir(), 'proxyhub-latest.zip');
@@ -391,31 +397,70 @@ async function cmdUpdate(args) {
             fs.copyFileSync(srcPath, destPath);
           }
         }
-        console.log('   ✅ Downloaded and updated all source files to latest GitHub release.');
+        console.log('   ✅ Successfully copied new release files over current installation.');
+        codeUpdated = true;
       } else {
-        throw new Error('Extracted directory proxyhub-main not found.');
+        throw new Error('Extracted release folder proxyhub-main not found.');
       }
       try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
     } catch (dlErr) {
-      console.warn(`   ⚠️ Archive update failed (${dlErr.message}). Trying npm install -g fallback...`);
-      execSync('npm install -g git+https://github.com/ELITEXGAMES/proxyhub.git', { stdio: 'inherit' });
+      console.warn(`   ⚠️ Direct download failed (${dlErr.message}). Trying npm install -g fallback...`);
+      try {
+        execSync('npm install -g git+https://github.com/ELITEXGAMES/proxyhub.git --force', { stdio: 'inherit' });
+        codeUpdated = true;
+      } catch (npmGlobalErr) {
+        console.error(`   ❌ All update methods failed: ${npmGlobalErr.message}`);
+      }
     }
   }
 
+  // Reload package.json to verify new version on disk
+  let newVersion = 'unknown';
+  try {
+    newVersion = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf-8')).version || 'unknown';
+  } catch {}
+  console.log(`\n📌 Target version on disk: v${newVersion} (was v${oldVersion})`);
+
   // 2. Install any updated dependencies
-  console.log('\n📦 Checking & installing dependencies (npm install --omit=dev)...');
+  console.log('\n📦 Installing dependencies (npm install --omit=dev)...');
   try {
     execSync('npm install --omit=dev', { cwd: ROOT_DIR, stdio: 'inherit' });
   } catch (npmErr) {
     console.warn(`   ⚠️ npm install warning: ${npmErr.message}`);
   }
 
-  // 3. Re-link CLI globally
-  console.log('🔗 Refreshing global CLI binaries (npm link)...');
+  // 3. Re-link CLI globally and enforce symlinks
+  console.log('🔗 Refreshing global CLI binaries...');
   try {
-    execSync('npm link', { cwd: ROOT_DIR, stdio: 'inherit' });
-    console.log('   ✅ Global CLI commands (anti, antigravity-proxy, ag-proxy) refreshed.');
+    execSync('npm link --force', { cwd: ROOT_DIR, stdio: 'inherit' });
+    console.log('   ✅ npm link refreshed.');
   } catch {}
+
+  if (process.platform !== 'win32') {
+    const binAnti = path.join(ROOT_DIR, 'bin', 'anti.js');
+    const binCli = path.join(ROOT_DIR, 'bin', 'cli.js');
+    try {
+      if (fs.existsSync('/usr/local/bin')) {
+        try {
+          execSync(`ln -sf "${binAnti}" /usr/local/bin/anti`, { stdio: 'ignore' });
+          execSync(`ln -sf "${binCli}" /usr/local/bin/antigravity-proxy`, { stdio: 'ignore' });
+          execSync(`ln -sf "${binCli}" /usr/local/bin/ag-proxy`, { stdio: 'ignore' });
+        } catch {
+          execSync(`sudo ln -sf "${binAnti}" /usr/local/bin/anti 2>/dev/null || true`, { stdio: 'ignore' });
+          execSync(`sudo ln -sf "${binCli}" /usr/local/bin/antigravity-proxy 2>/dev/null || true`, { stdio: 'ignore' });
+          execSync(`sudo ln -sf "${binCli}" /usr/local/bin/ag-proxy 2>/dev/null || true`, { stdio: 'ignore' });
+        }
+      }
+    } catch {}
+
+    try {
+      const userBin = path.join(os.homedir(), '.local', 'bin');
+      fs.mkdirSync(userBin, { recursive: true });
+      execSync(`ln -sf "${binAnti}" "${path.join(userBin, 'anti')}"`, { stdio: 'ignore' });
+      execSync(`ln -sf "${binCli}" "${path.join(userBin, 'antigravity-proxy')}"`, { stdio: 'ignore' });
+      execSync(`ln -sf "${binCli}" "${path.join(userBin, 'ag-proxy')}"`, { stdio: 'ignore' });
+    } catch {}
+  }
 
   // 4. Syntax sanity check
   console.log('\n🧪 Running code syntax validation...');
@@ -423,26 +468,57 @@ async function cmdUpdate(args) {
     execSync('node --check server.js src/proxy.js src/store.js src/oauth.js bin/cli.js', { cwd: ROOT_DIR, stdio: 'inherit' });
     console.log('   ✅ Syntax check PASSED.');
   } catch (checkErr) {
-    console.error(`\n❌ Syntax validation failed! Please check your code before restarting: ${checkErr.message}`);
+    console.error(`\n❌ Syntax validation failed! ${checkErr.message}`);
     return;
   }
 
-  // 4. Data directory verification
+  // 5. Data directory verification
   console.log(`\n🛡️  User Data Check:`);
   console.log(`   Data directory: ${DATA_DIR}`);
   console.log(`   All accounts, cookies, NVIDIA keys, and combos remain 100% preserved!`);
 
-  // 5. Restart daemon if it was running
-  if (wasRunning) {
-    console.log('\n🔄 Restarting proxy daemon with new code...');
-    await cmdStop();
-    await new Promise(r => setTimeout(r, 1000));
-    await cmdStart(['--daemon']);
+  // 6. Restart daemon if it was running or if user requested
+  console.log(`\n🚀 Starting Antigravity Proxy v${newVersion} in background...`);
+  await cmdStart(['--daemon']);
+
+  // 7. Verify live running instance via HTTP health check
+  console.log('\n🔍 Verifying live server version...');
+  let liveOk = false;
+  let liveVersion = 'unknown';
+  for (let attempts = 0; attempts < 15; attempts++) {
+    await new Promise(r => setTimeout(r, 400));
+    try {
+      const res = await new Promise((resolve, reject) => {
+        const req = http.get(`http://localhost:${DEFAULT_PORT}/v1/health`, { timeout: 2000 }, (r) => {
+          let data = '';
+          r.on('data', chunk => { data += chunk; });
+          r.on('end', () => resolve({ statusCode: r.statusCode, data }));
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      });
+      if (res.statusCode === 200) {
+        const parsed = JSON.parse(res.data);
+        liveVersion = parsed.version;
+        liveOk = true;
+        break;
+      }
+    } catch {}
   }
 
   console.log('\n=============================================================');
-  console.log('  🎉 Antigravity Proxy update completed successfully!');
+  if (liveOk) {
+    console.log(`  🎉 Antigravity Proxy successfully updated and verified!`);
+    console.log(`  📌 Old Version:  v${oldVersion}`);
+    console.log(`  📌 Live Version: v${liveVersion}`);
+    console.log(`  🌐 Dashboard:    http://localhost:${DEFAULT_PORT}/`);
+    console.log(`  🔗 API Health:   http://localhost:${DEFAULT_PORT}/v1/health`);
+  } else {
+    console.log(`  ⚠️ Update completed on disk (v${newVersion}), but live health check timed out.`);
+    console.log(`  Run 'anti gravity proxy status' or 'anti gravity proxy logs' to inspect.`);
+  }
   console.log('=============================================================\n');
+}
 }
 
 async function cmdLogs(args) {

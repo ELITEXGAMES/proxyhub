@@ -62,24 +62,29 @@ else
     sudo npm link 2>/dev/null || true
 fi
 
-# Fallback guarantee for Debian/Ubuntu: ensure symlinks exist in /usr/local/bin
-if ! command -v anti >/dev/null 2>&1; then
-    if [ -w /usr/local/bin ]; then
-        ln -sf "$INSTALL_DIR/bin/anti.js" /usr/local/bin/anti
-        ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/antigravity-proxy
-        ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/ag-proxy
-    elif command -v sudo >/dev/null 2>&1; then
-        echo "Creating symlinks in /usr/local/bin..."
-        sudo ln -sf "$INSTALL_DIR/bin/anti.js" /usr/local/bin/anti
-        sudo ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/antigravity-proxy
-        sudo ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/ag-proxy
-    else
-        mkdir -p "$HOME/.local/bin"
-        ln -sf "$INSTALL_DIR/bin/anti.js" "$HOME/.local/bin/anti"
-        ln -sf "$INSTALL_DIR/bin/cli.js" "$HOME/.local/bin/antigravity-proxy"
-        ln -sf "$INSTALL_DIR/bin/cli.js" "$HOME/.local/bin/ag-proxy"
-        export PATH="$HOME/.local/bin:$PATH"
-    fi
+# Ensure symlinks exist in /usr/local/bin and ~/.local/bin pointing to updated installation
+echo "🔗 Ensuring global symlinks point to $INSTALL_DIR..."
+if [ -w /usr/local/bin ]; then
+    ln -sf "$INSTALL_DIR/bin/anti.js" /usr/local/bin/anti
+    ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/antigravity-proxy
+    ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/ag-proxy
+elif command -v sudo >/dev/null 2>&1; then
+    sudo ln -sf "$INSTALL_DIR/bin/anti.js" /usr/local/bin/anti 2>/dev/null || true
+    sudo ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/antigravity-proxy 2>/dev/null || true
+    sudo ln -sf "$INSTALL_DIR/bin/cli.js" /usr/local/bin/ag-proxy 2>/dev/null || true
+fi
+
+mkdir -p "$HOME/.local/bin"
+ln -sf "$INSTALL_DIR/bin/anti.js" "$HOME/.local/bin/anti"
+ln -sf "$INSTALL_DIR/bin/cli.js" "$HOME/.local/bin/antigravity-proxy"
+ln -sf "$INSTALL_DIR/bin/cli.js" "$HOME/.local/bin/ag-proxy"
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Kill any stale proxy process on port 4000 to prevent old memory cache
+if command -v fuser >/dev/null 2>&1; then
+    fuser -k 4000/tcp 2>/dev/null || true
 fi
 
 echo ""
