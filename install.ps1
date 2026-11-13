@@ -1,4 +1,4 @@
-# 🚀 Antigravity Proxy Windows Turnkey Installer
+﻿# 🚀 Antigravity Proxy Windows Turnkey Installer
 # Usage:
 #   irm https://raw.githubusercontent.com/ELITEXGAMES/proxyhub/main/install.ps1 | iex
 # or:
@@ -35,7 +35,7 @@ try {
 
 # 3. Target Install Directory
 $installDir = "$HOME\.antigravity-proxy-app"
-if (Test-Path "$PSScriptRoot\package.json") {
+if ($PSScriptRoot -and (Test-Path "$PSScriptRoot\package.json") -and (Test-Path "$PSScriptRoot\bin\cli.js")) {
     $installDir = $PSScriptRoot
     Write-Host "📦 Installing from local directory: $installDir" -ForegroundColor Cyan
 } else {

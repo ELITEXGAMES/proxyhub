@@ -27,22 +27,23 @@ echo "✅ Git detected: $(git --version)"
 
 # 3. Target Install Directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [ -f "$SCRIPT_DIR/package.json" ]; then
+if [ -n "$SCRIPT_DIR" ] && [ "$SCRIPT_DIR" != "$HOME" ] && [ -f "$SCRIPT_DIR/package.json" ] && [ -f "$SCRIPT_DIR/bin/cli.js" ] && [ -f "$SCRIPT_DIR/bin/anti.js" ]; then
     INSTALL_DIR="$SCRIPT_DIR"
-    echo "📦 Installing from local directory: $INSTALL_DIR"
+    echo "📦 Installing from local source repository: $INSTALL_DIR"
 else
     INSTALL_DIR="$HOME/.antigravity-proxy-app"
     REPO_URL="${1:-https://github.com/ELITEXGAMES/proxyhub.git}"
-    echo "📥 Downloading latest release to $INSTALL_DIR..."
+    echo "📥 Downloading latest Antigravity Proxy release to $INSTALL_DIR..."
     rm -rf "$INSTALL_DIR"
     if command -v git >/dev/null 2>&1; then
-        git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
+        git clone "$REPO_URL" "$INSTALL_DIR"
     else
-        echo "📥 Downloading ZIP from GitHub..."
-        curl -fsSL https://github.com/ELITEXGAMES/proxyhub/archive/refs/heads/main.zip -o /tmp/proxyhub.zip
-        unzip -q /tmp/proxyhub.zip -d /tmp/proxyhub-extract
-        mv /tmp/proxyhub-extract/proxyhub-main "$INSTALL_DIR"
-        rm -rf /tmp/proxyhub.zip /tmp/proxyhub-extract
+        echo "📥 Downloading tarball from GitHub..."
+        mkdir -p "$INSTALL_DIR"
+        curl -fsSL https://github.com/ELITEXGAMES/proxyhub/archive/refs/heads/main.tar.gz -o /tmp/proxyhub.tar.gz
+        tar -xzf /tmp/proxyhub.tar.gz -C /tmp
+        cp -rf /tmp/proxyhub-main/* "$INSTALL_DIR"/
+        rm -rf /tmp/proxyhub.tar.gz /tmp/proxyhub-main
     fi
 fi
 
