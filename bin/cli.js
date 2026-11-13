@@ -519,7 +519,6 @@ async function cmdUpdate(args) {
   }
   console.log('=============================================================\n');
 }
-}
 
 async function cmdLogs(args) {
   let lines = 50;
