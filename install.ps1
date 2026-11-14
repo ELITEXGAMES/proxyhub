@@ -1,4 +1,4 @@
-﻿# 🚀 Antigravity Proxy Windows Turnkey Installer
+# 🚀 Antigravity Proxy Windows Turnkey Installer
 # Usage:
 #   irm https://raw.githubusercontent.com/ELITEXGAMES/proxyhub/main/install.ps1 | iex
 # or:

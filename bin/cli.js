@@ -124,11 +124,13 @@ function killPid(pid) {
     if (process.platform === 'win32') {
       execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
     } else {
-      try { process.kill(pid, 'SIGTERM'); } catch {}
-      setTimeout(() => {
-        try { process.kill(pid, 'SIGKILL'); } catch {}
-      }, 1000);
-      try { execSync(`fuser -k ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+      // SIGKILL immediately – SIGTERM is not reliable for orphaned/boot processes
+      try { process.kill(pid, 'SIGKILL'); } catch {}
+      // Also force-kill anything on port 4000 with SIGKILL
+      try { execSync(`fuser -k -9 ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+      try { execSync(`lsof -ti:${DEFAULT_PORT} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+      // If user doesn't have permission, try sudo
+      try { execSync(`sudo fuser -k -9 ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
     }
     return true;
   } catch {
@@ -156,12 +158,40 @@ async function cmdStart(args) {
 
   const existingPid = getRunningPid();
   if (existingPid) {
-    console.log(`\n⚠️  Antigravity Proxy is already running (PID: ${existingPid})`);
-    console.log(`   Dashboard:  http://localhost:${port}/`);
-    console.log(`   API Base:   http://localhost:${port}/v1`);
-    console.log(`   Run 'antigravity-proxy stop' or 'anti gravity proxy stop' to stop it.\n`);
-    if (shouldOpen) openBrowser(`http://localhost:${port}/`);
-    return;
+    // Check if the existing process is running OUR latest code by checking version
+    let isOurVersion = false;
+    try {
+      const res = await new Promise((resolve, reject) => {
+        const req = http.get(`http://127.0.0.1:${port}/v1/health`, { timeout: 2000 }, (r) => {
+          let data = '';
+          r.on('data', chunk => { data += chunk; });
+          r.on('end', () => resolve(data));
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      });
+      const parsed = JSON.parse(res);
+      isOurVersion = parsed.version === PKG.version;
+    } catch {}
+
+    if (isOurVersion) {
+      console.log(`\n⚠️  Antigravity Proxy v${PKG.version} is already running (PID: ${existingPid})`);
+      console.log(`   Dashboard:  http://localhost:${port}/`);
+      console.log(`   API Base:   http://localhost:${port}/v1`);
+      console.log(`   Run 'antigravity-proxy stop' or 'anti gravity proxy stop' to stop it.\n`);
+      if (shouldOpen) openBrowser(`http://localhost:${port}/`);
+      return;
+    }
+
+    // Stale/old version process is blocking the port — kill it
+    console.log(`\n⚠️  Stale process (PID: ${existingPid}) is running old code on port ${port}. Replacing it...`);
+    killPid(existingPid);
+    try { fs.unlinkSync(PID_FILE); } catch {}
+    if (process.platform !== 'win32') {
+      try { execSync(`sudo fuser -k -9 ${port}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+      try { execSync(`sudo kill -9 ${existingPid} 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+    }
+    await new Promise(r => setTimeout(r, 1500));
   }
 
   if (daemon) {
@@ -198,8 +228,25 @@ async function cmdStart(args) {
     if (online) {
       const livePid = findPortPid(port) || pid;
       if (livePid) fs.writeFileSync(PID_FILE, String(livePid), 'utf-8');
+
+      // Verify the running server is serving the correct version
+      let liveVersion = 'unknown';
+      try {
+        const vRes = await new Promise((resolve, reject) => {
+          const req = http.get(`http://127.0.0.1:${port}/v1/health`, { timeout: 2000 }, (r) => {
+            let data = '';
+            r.on('data', chunk => { data += chunk; });
+            r.on('end', () => resolve(data));
+          });
+          req.on('error', reject);
+          req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+        });
+        liveVersion = JSON.parse(vRes).version || 'unknown';
+      } catch {}
+
       console.log(`\n  ✅ Antigravity Proxy is now running in the background!`);
       console.log(`  📌 PID:        ${livePid || 'active'}`);
+      console.log(`  📌 Version:    v${liveVersion}`);
       console.log(`  🌐 Dashboard:  http://localhost:${port}/`);
       console.log(`  🔗 API Base:   http://localhost:${port}/v1`);
       console.log(`  📂 Data Dir:   ${DATA_DIR}`);
@@ -222,9 +269,14 @@ async function cmdStart(args) {
 }
 
 async function cmdStop() {
-  const pid = getRunningPid();
+  let pid = getRunningPid();
+
+  // Also detect any process on port 4000 even if PID file is stale
   if (!pid) {
-    // Check if port 4000 responds anyway
+    pid = findPortPid(DEFAULT_PORT);
+  }
+
+  if (!pid) {
     const isAlive = await checkHttpAlive(DEFAULT_PORT);
     if (!isAlive) {
       console.log('\nℹ️  Antigravity Proxy is not running.\n');
@@ -238,13 +290,32 @@ async function cmdStop() {
     try { fs.unlinkSync(PID_FILE); } catch {}
   }
 
-  // Double check port availability
-  await new Promise(r => setTimeout(r, 600));
+  // Also nuke any remaining process on port 4000
+  if (process.platform !== 'win32') {
+    try { execSync(`fuser -k -9 ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+    try { execSync(`lsof -ti:${DEFAULT_PORT} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+    try { execSync(`sudo fuser -k -9 ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+  }
+
+  // Wait and verify port is free
+  await new Promise(r => setTimeout(r, 1500));
   const stillAlive = await checkHttpAlive(DEFAULT_PORT);
   if (!stillAlive) {
     console.log('✅ Antigravity Proxy stopped successfully.\n');
   } else {
-    console.log('⚠️  Process signaled. Port may take a moment to be released.\n');
+    // Last resort: find and SIGKILL whatever is on the port
+    const stuckPid = findPortPid(DEFAULT_PORT);
+    if (stuckPid) {
+      console.log(`⚠️  Stale process PID ${stuckPid} still on port ${DEFAULT_PORT}. Force killing with sudo...`);
+      try { execSync(`sudo kill -9 ${stuckPid} 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+      await new Promise(r => setTimeout(r, 500));
+    }
+    const finalCheck = await checkHttpAlive(DEFAULT_PORT);
+    if (!finalCheck) {
+      console.log('✅ Antigravity Proxy stopped successfully (force-killed).\n');
+    } else {
+      console.log(`❌ Could not stop the process on port ${DEFAULT_PORT}. Try manually: sudo kill -9 ${stuckPid || pid}\n`);
+    }
   }
 }
 
