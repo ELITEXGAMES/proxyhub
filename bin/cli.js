@@ -62,7 +62,7 @@ function findPortPid(port) {
       }
     } else {
       try {
-        const out = execSync(`fuser ${port}/tcp 2>/dev/null || lsof -ti:${port} 2>/dev/null || ss -lptn 'sport = :${port}' 2>/dev/null`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+        const out = execSync(`lsof -ti:${port} -sTCP:LISTEN 2>/dev/null || ss -lptn 'sport = :${port}' 2>/dev/null`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
         const m = out.match(/\b(\d{2,6})\b/);
         if (m) {
           const pid = parseInt(m[1], 10);
@@ -119,19 +119,57 @@ function openBrowser(url) {
   }
 }
 
+function killPortListeners(port = DEFAULT_PORT) {
+  if (process.platform === 'win32') {
+    try {
+      const out = execSync('netstat -ano -p tcp', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
+      for (const line of out.split('\n')) {
+        if (line.includes(`:${port}`) && line.includes('LISTENING')) {
+          const parts = line.trim().split(/\s+/);
+          const pid = parseInt(parts[parts.length - 1], 10);
+          if (pid && !isNaN(pid) && pid !== process.pid && pid !== 0) {
+            try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch {}
+          }
+        }
+      }
+    } catch {}
+    return;
+  }
+
+  // Linux / macOS: strictly target listening server PIDs, NEVER kill current process (process.pid)
+  const targetPids = new Set();
+  try {
+    const lsofOut = execSync(`lsof -ti:${port} -sTCP:LISTEN 2>/dev/null`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    for (const p of lsofOut.split(/\s+/)) {
+      const num = parseInt(p, 10);
+      if (num && !isNaN(num) && num !== process.pid) targetPids.add(num);
+    }
+  } catch {}
+
+  try {
+    const ssOut = execSync(`ss -lptn 'sport = :${port}' 2>/dev/null`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    for (const match of ssOut.matchAll(/pid=(\d+)/g)) {
+      const num = parseInt(match[1], 10);
+      if (num && !isNaN(num) && num !== process.pid) targetPids.add(num);
+    }
+  } catch {}
+
+  for (const pid of targetPids) {
+    try { process.kill(pid, 'SIGKILL'); } catch {}
+    try { execSync(`sudo kill -9 ${pid} 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+  }
+}
+
 function killPid(pid) {
+  if (!pid || pid === process.pid) return false;
   try {
     if (process.platform === 'win32') {
       execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
     } else {
-      // SIGKILL immediately – SIGTERM is not reliable for orphaned/boot processes
       try { process.kill(pid, 'SIGKILL'); } catch {}
-      // Also force-kill anything on port 4000 with SIGKILL
-      try { execSync(`fuser -k -9 ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
-      try { execSync(`lsof -ti:${DEFAULT_PORT} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' }); } catch {}
-      // If user doesn't have permission, try sudo
-      try { execSync(`sudo fuser -k -9 ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
+      try { execSync(`sudo kill -9 ${pid} 2>/dev/null`, { stdio: 'ignore' }); } catch {}
     }
+    killPortListeners(DEFAULT_PORT);
     return true;
   } catch {
     return false;
@@ -187,11 +225,8 @@ async function cmdStart(args) {
     console.log(`\n⚠️  Stale process (PID: ${existingPid}) is running old code on port ${port}. Replacing it...`);
     killPid(existingPid);
     try { fs.unlinkSync(PID_FILE); } catch {}
-    if (process.platform !== 'win32') {
-      try { execSync(`sudo fuser -k -9 ${port}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
-      try { execSync(`sudo kill -9 ${existingPid} 2>/dev/null`, { stdio: 'ignore' }); } catch {}
-    }
-    await new Promise(r => setTimeout(r, 1500));
+    killPortListeners(port);
+    await new Promise(r => setTimeout(r, 1000));
   }
 
   if (daemon) {
@@ -290,12 +325,8 @@ async function cmdStop() {
     try { fs.unlinkSync(PID_FILE); } catch {}
   }
 
-  // Also nuke any remaining process on port 4000
-  if (process.platform !== 'win32') {
-    try { execSync(`fuser -k -9 ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
-    try { execSync(`lsof -ti:${DEFAULT_PORT} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' }); } catch {}
-    try { execSync(`sudo fuser -k -9 ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
-  }
+  // Also safely nuke any remaining listening process on port 4000
+  killPortListeners(DEFAULT_PORT);
 
   // Wait and verify port is free
   await new Promise(r => setTimeout(r, 1500));
@@ -382,22 +413,7 @@ async function cmdUpdate(args) {
   if (wasRunning) {
     console.log('📦 Proxy is currently running. Stopping old instance...');
     await cmdStop();
-    // Force kill port 4000 to ensure no stale process holds the socket
-    try {
-      if (process.platform === 'win32') {
-        const out = execSync(`netstat -ano | findstr :${DEFAULT_PORT}`, { encoding: 'utf-8' }).trim();
-        for (const line of out.split('\n')) {
-          const parts = line.trim().split(/\s+/);
-          const pid = parts[parts.length - 1];
-          if (pid && pid !== '0') {
-            try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch {}
-          }
-        }
-      } else {
-        try { execSync(`fuser -k ${DEFAULT_PORT}/tcp 2>/dev/null`, { stdio: 'ignore' }); } catch {}
-        try { execSync(`lsof -ti:${DEFAULT_PORT} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' }); } catch {}
-      }
-    } catch {}
+    killPortListeners(DEFAULT_PORT);
     try { fs.unlinkSync(PID_FILE); } catch {}
   }
 
